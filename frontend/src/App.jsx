@@ -8,6 +8,7 @@ import { ROUTES } from './utils/constants';
 
 // Pages
 import Dashboard from './pages/Dashboard';
+import UnifiedDashboard from './pages/UnifiedDashboard';
 import Logistics from './pages/Logistics';
 import CRM from './pages/CRM';
 import Infiverse from './pages/Infiverse';
@@ -23,6 +24,7 @@ import Emails from './pages/Emails';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
+import SupplierShowcase from './pages/SupplierShowcase';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -52,6 +54,7 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<Dashboard />} />
+            <Route path={ROUTES.UNIFIED} element={<UnifiedDashboard />} />
             <Route path={ROUTES.LOGISTICS} element={<Logistics />} />
             <Route path={ROUTES.CRM} element={<CRM />} />
             <Route path={ROUTES.INFIVERSE} element={<Infiverse />} />
@@ -67,6 +70,7 @@ function App() {
             <Route path={ROUTES.REPORTS} element={<Reports />} />
             <Route path={ROUTES.SETTINGS} element={<Settings />} />
             <Route path={ROUTES.USERS} element={<Users />} />
+            <Route path={ROUTES.SHOWCASE} element={<SupplierShowcase />} />
           </Route>
 
           {/* Catch all - redirect to dashboard in dev mode */}

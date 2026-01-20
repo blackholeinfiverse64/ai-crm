@@ -3,6 +3,7 @@ export const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
 export const ROUTES = {
   DASHBOARD: '/',
+  UNIFIED: '/unified',
   LOGISTICS: '/logistics',
   CRM: '/crm',
   INFIVERSE: '/infiverse',
@@ -18,6 +19,7 @@ export const ROUTES = {
   REPORTS: '/reports',
   SETTINGS: '/settings',
   USERS: '/users',
+  SHOWCASE: '/showcase',
 };
 
 export const STATUS_COLORS = {

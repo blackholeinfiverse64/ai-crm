@@ -14,17 +14,28 @@ export const AuthProvider = ({ children }) => {
     // Get initial session
     const initializeAuth = async () => {
       try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        setSession(initialSession);
-        setUser(initialSession?.user ?? null);
+        // Check if supabase is properly configured
+        if (supabase && supabase.auth && typeof supabase.auth.getSession === 'function') {
+          const { data: { session: initialSession } } = await supabase.auth.getSession();
+          setSession(initialSession);
+          setUser(initialSession?.user ?? null);
 
-        // Get user profile if session exists
-        if (initialSession?.user) {
-          const userProfile = await authService.getUserProfile(initialSession.user.id);
-          setProfile(userProfile);
+          // Get user profile if session exists
+          if (initialSession?.user) {
+            try {
+              const userProfile = await authService.getUserProfile(initialSession.user.id);
+              setProfile(userProfile);
+            } catch (profileError) {
+              console.warn('Could not load user profile:', profileError);
+            }
+          }
+        } else {
+          // Supabase not configured, skip auth
+          console.warn('Supabase not configured, skipping authentication');
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        // Don't block the app if auth fails
       } finally {
         setLoading(false);
       }
@@ -32,30 +43,44 @@ export const AuthProvider = ({ children }) => {
 
     initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        console.log('Auth state changed:', event);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
+    // Listen for auth changes (only if supabase is configured)
+    let subscription = null;
+    if (supabase && supabase.auth && typeof supabase.auth.onAuthStateChange === 'function') {
+      try {
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+          async (event, currentSession) => {
+            console.log('Auth state changed:', event);
+            setSession(currentSession);
+            setUser(currentSession?.user ?? null);
 
-        // Get profile when user signs in
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          const userProfile = await authService.getUserProfile(currentSession.user.id);
-          setProfile(userProfile);
-        }
+            // Get profile when user signs in
+            if (event === 'SIGNED_IN' && currentSession?.user) {
+              try {
+                const userProfile = await authService.getUserProfile(currentSession.user.id);
+                setProfile(userProfile);
+              } catch (profileError) {
+                console.warn('Could not load user profile:', profileError);
+              }
+            }
 
-        // Clear profile when user signs out
-        if (event === 'SIGNED_OUT') {
-          setProfile(null);
-        }
+            // Clear profile when user signs out
+            if (event === 'SIGNED_OUT') {
+              setProfile(null);
+            }
 
-        setLoading(false);
+            setLoading(false);
+          }
+        );
+        subscription = authSubscription;
+      } catch (error) {
+        console.warn('Could not set up auth state listener:', error);
       }
-    );
+    }
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription && subscription.unsubscribe) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
