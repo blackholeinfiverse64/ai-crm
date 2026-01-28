@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Mail, Send, Clock, CheckCircle, XCircle, AlertTriangle,
-  Plus, RefreshCw, Settings, FileText, Calendar
+  Plus, RefreshCw, Settings, FileText, Calendar, ChevronRight,
+  AtSign, Save
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
@@ -21,6 +22,15 @@ export const Emails = () => {
   const [emailActivity, setEmailActivity] = useState([]);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailType, setEmailType] = useState('restock');
+  
+  // Settings state
+  const [smtpSettings, setSmtpSettings] = useState({
+    host: 'smtp.gmail.com',
+    user: 'your-email@gmail.com',
+    port: 587,
+    sslTls: true
+  });
+  const [expandedTriggers, setExpandedTriggers] = useState({});
 
   const metrics = {
     emailsSentToday: 47,
@@ -71,6 +81,35 @@ export const Emails = () => {
     };
     return variants[status] || 'default';
   };
+
+  const toggleTrigger = (triggerId) => {
+    setExpandedTriggers(prev => ({
+      ...prev,
+      [triggerId]: !prev[triggerId]
+    }));
+  };
+
+  const portControls = useMemo(() => {
+    const dec = () => setSmtpSettings(p => ({ ...p, port: Math.max(1, (p.port || 587) - 1) }));
+    const inc = () => setSmtpSettings(p => ({ ...p, port: Math.min(65535, (p.port || 587) + 1) }));
+    return { dec, inc };
+  }, []);
+
+  const handleSaveSettings = async () => {
+    try {
+      await emsAPI.updateSettings(smtpSettings);
+      // Show success message
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    }
+  };
+
+  const triggers = [
+    { id: 'restock', name: 'Restock Request' },
+    { id: 'purchase', name: 'Purchase Order Created' },
+    { id: 'shipment', name: 'Shipment Created' },
+    { id: 'delay', name: 'Delivery Delay' },
+  ];
 
   if (loading) {
     return <LoadingSpinner text="Loading email automation..." />;
@@ -319,34 +358,152 @@ export const Emails = () => {
 
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Email Settings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">SMTP Host</label>
-                <Input defaultValue="smtp.gmail.com" />
+        <div className="space-y-6">
+          {/* EMS Settings Heading */}
+          <div className="flex items-center gap-3">
+            <Settings className="h-6 w-6" />
+            <h1 className="text-3xl font-heading font-bold tracking-tight">EMS Settings</h1>
+          </div>
+
+          {/* Email Configuration Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AtSign className="h-5 w-5 text-muted-foreground" />
+                <CardTitle>Email Configuration</CardTitle>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">SMTP Port</label>
-                  <Input type="number" defaultValue="587" />
+                  <label className="text-sm font-medium mb-2 block">SMTP Host</label>
+                  <Input 
+                    value={smtpSettings.host}
+                    onChange={(e) => setSmtpSettings({ ...smtpSettings, host: e.target.value })}
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">SMTP User</label>
-                  <Input defaultValue="your-email@gmail.com" />
+                  <Input 
+                    value={smtpSettings.user}
+                    onChange={(e) => setSmtpSettings({ ...smtpSettings, user: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">SMTP Port</label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={portControls.dec}
+                      className="h-10 w-10 p-0"
+                    >
+                      -
+                    </Button>
+                    <Input 
+                      type="number"
+                      value={smtpSettings.port}
+                      onChange={(e) => setSmtpSettings({ ...smtpSettings, port: parseInt(e.target.value) || 587 })}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={portControls.inc}
+                      className="h-10 w-10 p-0"
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="ssl_tls"
+                    checked={smtpSettings.sslTls}
+                    onChange={(e) => setSmtpSettings({ ...smtpSettings, sslTls: e.target.checked })}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="ssl_tls" className="text-sm font-medium">
+                    Enable SSL/TLS
+                  </label>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Trigger Settings Section */}
+          <Card>
+            <CardHeader>
               <div className="flex items-center gap-2">
-                <input type="checkbox" defaultChecked className="rounded" />
-                <label className="text-sm">Enable SSL/TLS</label>
+                <RefreshCw className="h-5 w-5 text-muted-foreground" />
+                <CardTitle>Trigger Settings</CardTitle>
               </div>
-              <Button>Save Settings</Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {triggers.map((trigger) => {
+                  const isExpanded = expandedTriggers[trigger.id];
+                  return (
+                    <div key={trigger.id} className="border border-border rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => toggleTrigger(trigger.id)}
+                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <ChevronRight 
+                            className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                          />
+                          <span className="font-medium">{trigger.name}</span>
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-6 pb-4 pt-2 border-t border-border">
+                          <div className="space-y-3 text-sm">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`trigger_${trigger.id}_enabled`}
+                                defaultChecked
+                                className="h-4 w-4 rounded border-border"
+                              />
+                              <label htmlFor={`trigger_${trigger.id}_enabled`} className="text-sm">
+                                Enable this trigger
+                              </label>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium mb-1 block">Recipient Email</label>
+                              <Input placeholder="email@example.com" className="text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium mb-1 block">Template</label>
+                              <select className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm">
+                                <option>Default Template</option>
+                                <option>Custom Template 1</option>
+                                <option>Custom Template 2</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save Settings Button */}
+          <div className="flex justify-start">
+            <Button onClick={handleSaveSettings} className="gap-2">
+              <Save className="h-4 w-4" />
+              Save Settings
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Email Modal */}

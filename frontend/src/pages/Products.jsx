@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Package, Plus, Search, Filter, Edit2, Trash2, Upload, 
-  Image as ImageIcon, Grid, List, Eye
+  Package, Plus, Search, Edit2, Upload, 
+  Image as ImageIcon, Grid, List, ClipboardList
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
@@ -17,6 +17,7 @@ import { formatDate } from '@/utils/dateUtils';
 export const Products = () => {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
+  const [activeTab, setActiveTab] = useState('catalog'); // catalog | manage
   const [viewMode, setViewMode] = useState('grid'); // grid or list
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -104,18 +105,50 @@ export const Products = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Tabs */}
+      <div className="flex items-center gap-6 border-b border-border pb-2">
+        <button
+          onClick={() => setActiveTab('catalog')}
+          className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors ${
+            activeTab === 'catalog'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Grid className="h-4 w-4" />
+          Product Catalog
+        </button>
+        <button
+          onClick={() => setActiveTab('manage')}
+          className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors ${
+            activeTab === 'manage'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <ClipboardList className="h-4 w-4" />
+          Manage Products
+        </button>
+      </div>
+
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-        <h1 className="text-3xl font-heading font-bold tracking-tight">Product Catalog</h1>
+        <h1 className="text-3xl font-heading font-bold tracking-tight">
+          {activeTab === 'catalog' ? 'Product Catalog' : 'Manage Products'}
+        </h1>
           <p className="text-muted-foreground mt-1">
-            Manage your product inventory and catalog
+            {activeTab === 'catalog'
+              ? 'Browse your product catalog'
+              : 'Add, edit, and manage product inventory'}
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Product
-        </Button>
+        {activeTab === 'manage' && (
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>
+        )}
       </div>
 
       {/* Metrics */}
@@ -146,172 +179,261 @@ export const Products = () => {
         />
       </div>
 
-      {/* Filters and View Toggle */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4 flex-1">
-              <Input
-                placeholder="Search products..."
-                icon={Search}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64"
-              />
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-4 py-2 rounded-lg border border-border bg-background"
-              >
-                <option value="all">All Categories</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Accessories">Accessories</option>
-                <option value="Furniture">Furniture</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={viewMode === 'grid' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Products Display */}
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <Card key={product.id} hover className="overflow-hidden">
-              <div className="relative h-48 bg-muted flex items-center justify-center">
-                <img 
-                  src={product.image} 
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-                <Badge 
-                  variant={getStatusVariant(product.status)}
-                  className="absolute top-2 right-2"
-                >
-                  {product.status.replace('_', ' ')}
-                </Badge>
-              </div>
-              <CardContent className="pt-4">
-                <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                <p className="text-sm text-muted-foreground mb-2">{product.id}</p>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-2xl font-bold">${product.price}</span>
-                  <span className="text-sm text-muted-foreground">Stock: {product.stock}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setShowEditModal(true);
-                    }}
-                  >
-                    <Edit2 className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setShowImageModal(true);
-                    }}
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
+      {/* Filters and View Toggle (Catalog) */}
+      {activeTab === 'catalog' && (
         <Card>
-          <CardHeader>
-            <CardTitle>Products List</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Image</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <img src={product.image} alt={product.name} className="w-12 h-12 rounded object-cover" />
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">{product.id}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell className="font-semibold">${product.price}</TableCell>
-                    <TableCell>{product.stock}</TableCell>
-                    <TableCell>{product.supplier}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(product.status)}>
-                        {product.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setShowEditModal(true);
-                          }}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setShowImageModal(true);
-                          }}
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 flex-1">
+                <Input
+                  placeholder="Search products..."
+                  icon={Search}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-64"
+                />
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-4 py-2 rounded-lg border border-border bg-background"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Accessories">Accessories</option>
+                  <option value="Furniture">Furniture</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === 'grid' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <Grid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Product Catalog */}
+      {activeTab === 'catalog' && (
+        <>
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map((product) => (
+                <Card key={product.id} hover className="overflow-hidden">
+                  <div className="relative h-48 bg-muted flex items-center justify-center">
+                    <img 
+                      src={product.image} 
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <Badge 
+                      variant={getStatusVariant(product.status)}
+                      className="absolute top-2 right-2"
+                    >
+                      {product.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  <CardContent className="pt-4">
+                    <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-2">{product.id}</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-2xl font-bold">${product.price}</span>
+                      <span className="text-sm text-muted-foreground">Stock: {product.stock}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => setActiveTab('manage')}
+                      >
+                        <ClipboardList className="h-4 w-4 mr-1" />
+                        Manage
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedProduct(product);
+                          setShowImageModal(true);
+                        }}
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Products List</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Image</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Stock</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <img src={product.image} alt={product.name} className="w-12 h-12 rounded object-cover" />
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            <div className="text-sm text-muted-foreground">{product.id}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{product.category}</TableCell>
+                        <TableCell className="font-semibold">${product.price}</TableCell>
+                        <TableCell>{product.stock}</TableCell>
+                        <TableCell>{product.supplier}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusVariant(product.status)}>
+                            {product.status.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="outline" size="sm" onClick={() => setActiveTab('manage')}>
+                            Manage
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* Manage Products */}
+      {activeTab === 'manage' && (
+        <>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <Input
+                    placeholder="Search products..."
+                    icon={Search}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-64"
+                  />
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="px-4 py-2 rounded-lg border border-border bg-background"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Furniture">Furniture</option>
+                  </select>
+                </div>
+                <Button onClick={() => setShowAddModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Product
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Manage Products</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <img src={product.image} alt={product.name} className="w-12 h-12 rounded object-cover" />
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground">{product.id}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{product.category}</TableCell>
+                      <TableCell className="font-semibold">${product.price}</TableCell>
+                      <TableCell>{product.stock}</TableCell>
+                      <TableCell>{product.supplier}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(product.status)}>
+                          {product.status.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setShowEditModal(true);
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setShowImageModal(true);
+                            }}
+                          >
+                            <ImageIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Add Product Modal */}

@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ClipboardList,
   Clock,
+  LayoutDashboard,
   Mail,
   Phone,
   Plus,
@@ -13,6 +14,10 @@ import Button from '@/components/common/ui/Button';
 import Input from '@/components/common/forms/Input';
 import Alert from '@/components/common/ui/Alert';
 import Badge from '@/components/common/ui/Badge';
+import MetricCard from '@/components/common/charts/MetricCard';
+import LineChart from '@/components/common/charts/LineChart';
+import BarChart from '@/components/common/charts/BarChart';
+import PieChart from '@/components/common/charts/PieChart';
 import { API_BASE_URL } from '@/utils/constants';
 
 export const Suppliers = () => {
@@ -22,7 +27,7 @@ export const Suppliers = () => {
   const [success, setSuccess] = useState(null);
 
   // UI state (matches screenshot tabs)
-  const [activeTab, setActiveTab] = useState('current'); // 'current' | 'add'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'current' | 'add'
   const [expandedSupplierId, setExpandedSupplierId] = useState(null);
 
   // Add supplier form state
@@ -104,10 +109,76 @@ export const Suppliers = () => {
     return { dec, inc };
   }, []);
 
+  // Overview computed metrics + charts (based on loaded suppliers)
+  const overview = useMemo(() => {
+    const total = suppliers.length;
+    const active = suppliers.filter((s) => s.is_active !== false).length;
+    const inactive = total - active;
+    const withEmail = suppliers.filter((s) => !!s.contact_email).length;
+    const withPhone = suppliers.filter((s) => !!s.contact_phone).length;
+    const avgLeadTime =
+      total > 0
+        ? Number(
+            (
+              suppliers.reduce((sum, s) => sum + (Number(s.lead_time_days) || 0), 0) /
+              total
+            ).toFixed(1)
+          )
+        : 0;
+
+    const statusData = [
+      { name: 'Active', value: active },
+      { name: 'Inactive', value: inactive },
+    ];
+
+    const leadTimeData = suppliers
+      .slice()
+      .sort((a, b) => (Number(b.lead_time_days) || 0) - (Number(a.lead_time_days) || 0))
+      .slice(0, 8)
+      .map((s) => ({
+        name: (s.name || s.supplier_id || 'Supplier').slice(0, 12),
+        days: Number(s.lead_time_days) || 0,
+      }));
+
+    // Simple mock trend (until backend provides time-series). Scales with total suppliers.
+    const base = Math.max(0, total - 6);
+    const trendData = [
+      { name: 'Aug', suppliers: base + 1 },
+      { name: 'Sep', suppliers: base + 2 },
+      { name: 'Oct', suppliers: base + 3 },
+      { name: 'Nov', suppliers: base + 4 },
+      { name: 'Dec', suppliers: base + 5 },
+      { name: 'Jan', suppliers: total },
+    ];
+
+    return {
+      total,
+      active,
+      inactive,
+      withEmail,
+      withPhone,
+      avgLeadTime,
+      statusData,
+      leadTimeData,
+      trendData,
+    };
+  }, [suppliers]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Tabs (matches screenshot) */}
       <div className="flex items-center gap-6 border-b border-border pb-2">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors ${
+            activeTab === 'overview'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          Overview
+        </button>
         <button
           onClick={() => setActiveTab('current')}
           className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors ${
@@ -142,6 +213,76 @@ export const Suppliers = () => {
         <Alert variant="success" onClose={() => setSuccess(null)}>
           {success}
         </Alert>
+      )}
+
+      {/* Overview */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold tracking-tight">Supplier Overview</h1>
+            <p className="text-muted-foreground mt-1">
+              Summary metrics and performance indicators for your supplier network
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="text-muted-foreground">Loading suppliers...</div>
+          ) : (
+            <>
+              {/* Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <MetricCard
+                  title="Total Suppliers"
+                  value={overview.total}
+                  icon={Building2}
+                  variant="primary"
+                  trend="up"
+                  trendValue="+4.1%"
+                />
+                <MetricCard
+                  title="Active Suppliers"
+                  value={overview.active}
+                  icon={ClipboardList}
+                  variant="success"
+                  trend="up"
+                  trendValue="+2.0%"
+                />
+                <MetricCard
+                  title="Avg Lead Time"
+                  value={`${overview.avgLeadTime} days`}
+                  icon={Clock}
+                  variant="warning"
+                />
+                <MetricCard
+                  title="Contacts Available"
+                  value={`${overview.withEmail}/${overview.withPhone}`}
+                  icon={Mail}
+                  variant="info"
+                />
+              </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <PieChart title="Active vs Inactive" data={overview.statusData} height={320} />
+                <LineChart
+                  title="Suppliers Growth (Trend)"
+                  data={overview.trendData}
+                  lines={[{ dataKey: 'suppliers', name: 'Suppliers' }]}
+                  height={320}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <BarChart
+                  title="Top Lead Times (days)"
+                  data={overview.leadTimeData}
+                  bars={[{ dataKey: 'days', name: 'Lead Time (days)' }]}
+                  height={340}
+                />
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {/* Current Suppliers */}
