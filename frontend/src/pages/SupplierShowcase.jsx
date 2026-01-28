@@ -103,16 +103,6 @@ export const SupplierShowcase = () => {
         </div>
       </div>
 
-      {/* Hero Banner */}
-      <Card className="bg-gradient-to-r from-primary via-secondary to-accent text-white border-0">
-        <CardContent className="pt-6">
-          <div className="text-center py-8">
-            <h2 className="text-3xl font-bold mb-2">Professional Product Showcase</h2>
-            <p className="text-lg opacity-90">Designed for suppliers and sales teams</p>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
