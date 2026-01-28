@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Brain, Zap, TrendingUp, Target, Play, Settings,
-  Route, Package, BarChart3, Clock
+  Route, Package, BarChart3, Clock,
+  CheckSquare, Wrench, Heart, Save, Rocket
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Input from '../components/common/forms/Input';
+import Select from '../components/common/forms/Select';
 import Badge from '../components/common/ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
@@ -20,6 +22,31 @@ export const Decisions = () => {
   const [decisionHistory, setDecisionHistory] = useState([]);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [decisionType, setDecisionType] = useState('route_optimization');
+  
+  // Workflow form state
+  const [workflowForm, setWorkflowForm] = useState({
+    workflowType: 'order_processing',
+    orderId: 'ORD_001',
+    customerEmail: 'customer@example.com',
+    priority: 'high',
+    orderValue: 500.00,
+    inventoryJson: '{"item_A": 10, "item_B": 5, "item_C": 20}',
+    salesJson:
+      '[{"item_id": "item_A", "sales": [20, 25, 22]}, {"item_id": "item_B", "sales": [15, 18, 16]}]'
+  });
+
+  // Settings state (UI only for now)
+  const [capabilities, setCapabilities] = useState({
+    routeOptimization: true,
+    procurementDecisions: true,
+    inventoryForecasting: true,
+    delayRiskAssessment: true,
+    supplierSelection: true,
+  });
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.7);
+  const [riskTolerance, setRiskTolerance] = useState(0.5);
+  const [autoExecuteHighConfidence, setAutoExecuteHighConfidence] = useState(false);
+  const [enableDecisionNotifications, setEnableDecisionNotifications] = useState(true);
 
   const metrics = {
     totalDecisions: 1248,
@@ -41,6 +68,22 @@ export const Decisions = () => {
       setLoading(false);
     }, 800);
   }, []);
+
+  const orderValueControls = useMemo(() => {
+    const dec = () => setWorkflowForm(p => ({ ...p, orderValue: Math.max(0, (p.orderValue || 0) - 1) }));
+    const inc = () => setWorkflowForm(p => ({ ...p, orderValue: (p.orderValue || 0) + 1 }));
+    return { dec, inc };
+  }, []);
+
+  const handleStartWorkflow = async () => {
+    try {
+      // API call to start workflow
+      console.log('Starting workflow:', workflowForm);
+      // await aiDecisionsAPI.startWorkflow(workflowForm);
+    } catch (error) {
+      console.error('Error starting workflow:', error);
+    }
+  };
 
   if (loading) {
     return <LoadingSpinner text="Loading AI decision engine..." />;
@@ -201,43 +244,140 @@ export const Decisions = () => {
 
       {/* Workflows Tab */}
       {activeTab === 'workflows' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Decision Workflows</CardTitle>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Workflow
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Card hover>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold mb-1">Automated Route Optimization</h3>
-                      <p className="text-sm text-muted-foreground">Runs daily at 6:00 AM</p>
+        <div className="space-y-6">
+          {/* Workflow Type */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Workflow Type</label>
+            <Select
+              value={workflowForm.workflowType}
+              onChange={(e) => setWorkflowForm({ ...workflowForm, workflowType: e.target.value })}
+              options={[
+                { value: 'order_processing', label: 'Order Processing' },
+                { value: 'inventory_optimization', label: 'Inventory Optimization' },
+              ]}
+              className="border-primary focus-visible:ring-primary"
+            />
+          </div>
+
+          {/* Workflow Form (conditional by type) */}
+          <Card className="border border-border">
+            <CardContent className="p-6">
+              {workflowForm.workflowType === 'order_processing' ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Order ID</label>
+                        <Input
+                          value={workflowForm.orderId}
+                          onChange={(e) => setWorkflowForm({ ...workflowForm, orderId: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Customer Email</label>
+                        <Input
+                          type="email"
+                          value={workflowForm.customerEmail}
+                          onChange={(e) => setWorkflowForm({ ...workflowForm, customerEmail: e.target.value })}
+                        />
+                      </div>
                     </div>
-                    <Badge variant="success">Active</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card hover>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold mb-1">Procurement Decision Workflow</h3>
-                      <p className="text-sm text-muted-foreground">Triggers on low stock</p>
+
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Priority</label>
+                        <Select
+                          value={workflowForm.priority}
+                          onChange={(e) => setWorkflowForm({ ...workflowForm, priority: e.target.value })}
+                          options={[
+                            { value: 'low', label: 'Low' },
+                            { value: 'medium', label: 'Medium' },
+                            { value: 'high', label: 'High' },
+                          ]}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Order Value</label>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={orderValueControls.dec}
+                            className="h-10 w-10 p-0"
+                          >
+                            -
+                          </Button>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={workflowForm.orderValue}
+                            onChange={(e) =>
+                              setWorkflowForm({
+                                ...workflowForm,
+                                orderValue: parseFloat(e.target.value) || 0,
+                              })
+                            }
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={orderValueControls.inc}
+                            className="h-10 w-10 p-0"
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <Badge variant="success">Active</Badge>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </CardContent>
-        </Card>
+
+                  <div className="mt-6 flex justify-start">
+                    <Button onClick={handleStartWorkflow} className="gap-2">
+                      <Rocket className="h-4 w-4" />
+                      Start Order Workflow
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Current Inventory</h3>
+                      <label className="text-sm font-medium text-muted-foreground">Inventory Data (JSON)</label>
+                      <textarea
+                        value={workflowForm.inventoryJson}
+                        onChange={(e) => setWorkflowForm({ ...workflowForm, inventoryJson: e.target.value })}
+                        className="w-full min-h-[110px] rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Historical Sales Data</h3>
+                      <label className="text-sm font-medium text-muted-foreground">Sales Data (JSON)</label>
+                      <textarea
+                        value={workflowForm.salesJson}
+                        onChange={(e) => setWorkflowForm({ ...workflowForm, salesJson: e.target.value })}
+                        className="w-full min-h-[110px] rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-start">
+                    <Button onClick={handleStartWorkflow} className="gap-2">
+                      <Rocket className="h-4 w-4" />
+                      Start Inventory Workflow
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Analytics Tab */}
@@ -291,28 +431,168 @@ export const Decisions = () => {
 
       {/* Settings Tab */}
       {activeTab === 'settings' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Decision Engine Settings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Confidence Threshold</label>
-                <Input type="number" step="0.01" defaultValue="0.7" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Risk Tolerance</label>
-                <Input type="number" step="0.01" defaultValue="0.5" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Optimization Weight</label>
-                <Input type="number" step="0.01" defaultValue="1.0" />
-              </div>
-              <Button>Save Settings</Button>
+        <div className="space-y-8">
+          {/* Heading */}
+          <div className="flex items-center gap-3">
+            <Settings className="h-6 w-6" />
+            <h1 className="text-3xl font-heading font-bold tracking-tight">AI Decision Settings</h1>
+          </div>
+
+          {/* Engine Capabilities */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="h-6 w-6" />
+              <h2 className="text-2xl font-heading font-bold tracking-tight">Engine Capabilities</h2>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="space-y-3">
+              {[
+                { key: 'routeOptimization', label: 'Route Optimization' },
+                { key: 'procurementDecisions', label: 'Procurement Decisions' },
+                { key: 'inventoryForecasting', label: 'Inventory Forecasting' },
+                { key: 'delayRiskAssessment', label: 'Delay Risk Assessment' },
+                { key: 'supplierSelection', label: 'Supplier Selection' },
+              ].map((cap) => (
+                <div
+                  key={cap.key}
+                  className="rounded-lg border border-success/30 bg-success/15 px-4 py-4"
+                >
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!capabilities[cap.key]}
+                      onChange={(e) =>
+                        setCapabilities((p) => ({ ...p, [cap.key]: e.target.checked }))
+                      }
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <span className="font-medium text-success">{cap.label}</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Configuration */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Wrench className="h-6 w-6" />
+              <h2 className="text-2xl font-heading font-bold tracking-tight">Configuration</h2>
+            </div>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Sliders */}
+                  <div className="space-y-6">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium">Confidence Threshold</label>
+                        <span className="text-sm font-semibold text-destructive">
+                          {confidenceThreshold.toFixed(2)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={confidenceThreshold}
+                        onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                        className="w-full accent-destructive"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium">Risk Tolerance</label>
+                        <span className="text-sm font-semibold text-destructive">
+                          {riskTolerance.toFixed(2)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={riskTolerance}
+                        onChange={(e) => setRiskTolerance(Number(e.target.value))}
+                        className="w-full accent-destructive"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Toggles */}
+                  <div className="space-y-4">
+                    <label className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={autoExecuteHighConfidence}
+                        onChange={(e) => setAutoExecuteHighConfidence(e.target.checked)}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      <span className="font-medium">Auto-execute High Confidence Decisions</span>
+                    </label>
+                    <label className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={enableDecisionNotifications}
+                        onChange={(e) => setEnableDecisionNotifications(e.target.checked)}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      <span className="font-medium">Enable Decision Notifications</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <Button className="gap-2" onClick={() => {}}>
+                    <Save className="h-4 w-4" />
+                    Save Settings
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* System Status */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Heart className="h-6 w-6 text-success" />
+              <h2 className="text-2xl font-heading font-bold tracking-tight">System Status</h2>
+            </div>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-lg border border-border bg-muted/20 p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-success" />
+                      <span className="font-medium">Engine</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">Online</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/20 p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-success" />
+                      <span className="font-medium">Models</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">Loaded</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/20 p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-success" />
+                      <span className="font-medium">Notifications</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {enableDecisionNotifications ? 'Enabled' : 'Disabled'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
 
       {/* Decision Modal */}
