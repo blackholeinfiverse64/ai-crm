@@ -8,7 +8,7 @@ const ProtectedRoute = ({ children }) => {
 
   // DEVELOPMENT MODE: Bypass authentication
   // Set to false when you want to enable authentication
-  const DEV_MODE_SKIP_AUTH = true;
+  const DEV_MODE_SKIP_AUTH = false;
 
   if (DEV_MODE_SKIP_AUTH) {
     return children;

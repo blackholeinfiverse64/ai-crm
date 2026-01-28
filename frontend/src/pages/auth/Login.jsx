@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, Info } from 'lucide-react';
 import AuthLayout from '../../components/auth/AuthLayout';
@@ -21,6 +21,15 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Show splash screen for 5 seconds on initial load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -69,6 +78,29 @@ const Login = () => {
       setError('GitHub login failed. Please try again.');
     }
   };
+
+  if (showSplash) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center space-y-6 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl gradient-primary shadow-glow-primary mx-auto">
+            <Loader2 className="h-8 w-8 text-primary-foreground animate-spin" />
+          </div>
+          <div>
+            <h1 className="text-3xl md:text-4xl font-heading font-bold tracking-tight text-white">
+              AI Agent Logistics System
+            </h1>
+            <p className="mt-3 text-base md:text-lg text-slate-300">
+              Preparing your intelligent logistics workspace&hellip;
+            </p>
+          </div>
+          <p className="text-xs text-slate-500">
+            Optimizing dashboards, agents, and workflows. This will only take a moment.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AuthLayout

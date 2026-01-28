@@ -239,20 +239,20 @@ export const Logistics = () => {
       {/* Overview Section */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div>
+        <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">Logistics & Inventory Overview</h1>
-            <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1">
               Comprehensive view of orders, shipments, inventory, and agent activity
-            </p>
-          </div>
+          </p>
+      </div>
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <MetricCard
-              title="Total Orders"
+        <MetricCard
+          title="Total Orders"
               value={overviewMetrics.totalOrders}
-              icon={Package}
-              variant="primary"
+          icon={Package}
+          variant="primary"
               trend="up"
               trendValue="+12.5%"
             />
@@ -269,28 +269,28 @@ export const Logistics = () => {
               value={overviewMetrics.processingOrders}
               icon={Activity}
               variant="warning"
-            />
-            <MetricCard
-              title="In Transit"
+        />
+        <MetricCard
+          title="In Transit"
               value={overviewMetrics.inTransitShipments}
-              icon={Truck}
-              variant="info"
-            />
-            <MetricCard
+          icon={Truck}
+          variant="info"
+        />
+        <MetricCard
               title="Total Inventory"
               value={overviewMetrics.totalInventory}
               icon={BarChart3}
-              variant="success"
+          variant="success"
               trend="up"
               trendValue="+5.3%"
-            />
-            <MetricCard
+        />
+        <MetricCard
               title="Agent Actions"
               value={overviewMetrics.agentActions}
               icon={Bot}
               variant="accent"
-            />
-          </div>
+        />
+      </div>
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -482,8 +482,8 @@ export const Logistics = () => {
           </div>
 
           {/* Current Stock Levels Bar Chart */}
-          <Card>
-            <CardHeader>
+      <Card>
+        <CardHeader>
               <CardTitle>Current Stock Levels by Product</CardTitle>
             </CardHeader>
             <CardContent>
@@ -578,9 +578,9 @@ export const Logistics = () => {
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
+          <Table>
+            <TableHeader>
+              <TableRow>
                       <TableHead>shipment_id</TableHead>
                       <TableHead>order_id</TableHead>
                       <TableHead>courier_id</TableHead>
@@ -588,20 +588,20 @@ export const Logistics = () => {
                       <TableHead>status</TableHead>
                       <TableHead>origin_address</TableHead>
                       <TableHead>destination</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
                     {shipments.map((shipment) => (
                       <TableRow key={shipment.shipment_id}>
                         <TableCell className="font-medium">{shipment.shipment_id}</TableCell>
                         <TableCell>{shipment.order_id}</TableCell>
                         <TableCell>{shipment.courier_id}</TableCell>
                         <TableCell>{shipment.tracking_number}</TableCell>
-                        <TableCell>
+                  <TableCell>
                           <Badge variant={getStatusVariant(shipment.status)}>
                             {shipment.status}
-                          </Badge>
-                        </TableCell>
+                    </Badge>
+                  </TableCell>
                         <TableCell>{shipment.origin_address}</TableCell>
                         <TableCell className="max-w-xs truncate">{shipment.destination}</TableCell>
                       </TableRow>
@@ -675,9 +675,9 @@ export const Logistics = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Recent Agent Activity</CardTitle>
-                <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm">
                   <RefreshCw className="h-4 w-4" />
-                </Button>
+                    </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -711,15 +711,15 @@ export const Logistics = () => {
                             readOnly
                             className="h-4 w-4 rounded border-border"
                           />
-                        </TableCell>
+                  </TableCell>
                         <TableCell className="max-w-xs truncate">{activity.details}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
               </div>
-            </CardContent>
-          </Card>
+        </CardContent>
+      </Card>
         </div>
       )}
     </div>

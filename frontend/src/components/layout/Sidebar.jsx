@@ -3,11 +3,13 @@ import {
   LayoutDashboard, Package, Users, Building2, ShoppingCart, Bot,
   Workflow, Brain, GraduationCap, Bell, Mail, BarChart3, Settings,
   UsersRound, Menu, X, ChevronLeft, ChevronRight, TrendingUp, Zap,
-  FileText, Store, Activity, Database, Sparkles
+  FileText, Store, Activity, Database, Sparkles, LogOut
 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { cn } from '@/utils/helpers';
 import { ROUTES } from '@/utils/constants';
+import Button from '../common/ui/Button';
+import { useAuth } from '@/context/AuthContext';
 
 const navigation = [
   { name: 'Overview', icon: LayoutDashboard, path: ROUTES.DASHBOARD },
@@ -47,6 +49,18 @@ const navigation = [
 ];
 
 export const Sidebar = ({ isOpen, onToggle, isCollapsed, onCollapseToggle }) => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/auth/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -60,7 +74,7 @@ export const Sidebar = ({ isOpen, onToggle, isCollapsed, onCollapseToggle }) => 
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 h-screen bg-card border-r border-border shadow-xl backdrop-blur-sm transition-all duration-300',
+          'fixed left-0 top-0 z-50 h-screen bg-card border-r border-border shadow-xl backdrop-blur-sm transition-all duration-300 flex flex-col',
           isCollapsed ? 'w-16' : 'w-64',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
@@ -138,6 +152,21 @@ export const Sidebar = ({ isOpen, onToggle, isCollapsed, onCollapseToggle }) => 
             </div>
           ))}
         </nav>
+
+        {/* Sign Out button */}
+        <div className="border-t border-border px-3 py-3">
+          <Button
+            variant="outline"
+            className={cn(
+              'w-full flex items-center justify-center text-destructive border-destructive/40 hover:bg-destructive hover:text-destructive-foreground',
+              isCollapsed && 'px-0'
+            )}
+            onClick={handleLogout}
+          >
+            <LogOut className={cn('h-4 w-4', !isCollapsed && 'mr-2')} />
+            {!isCollapsed && <span className="font-semibold text-sm">Sign Out</span>}
+          </Button>
+        </div>
       </aside>
     </>
   );

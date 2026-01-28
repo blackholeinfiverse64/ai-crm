@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
+import { 
   Building2,
   ChevronRight,
   ClipboardList,
@@ -25,11 +25,11 @@ export const Suppliers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-
+  
   // UI state (matches screenshot tabs)
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'current' | 'add'
   const [expandedSupplierId, setExpandedSupplierId] = useState(null);
-
+  
   // Add supplier form state
   const [formData, setFormData] = useState({
     supplier_id: '',
@@ -198,8 +198,8 @@ export const Suppliers = () => {
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Plus className="h-4 w-4" />
-          Add Supplier
+            <Plus className="h-4 w-4" />
+            Add Supplier
         </button>
       </div>
 
@@ -218,12 +218,12 @@ export const Suppliers = () => {
       {/* Overview */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div>
+              <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">Supplier Overview</h1>
             <p className="text-muted-foreground mt-1">
               Summary metrics and performance indicators for your supplier network
             </p>
-          </div>
+            </div>
 
           {loading ? (
             <div className="text-muted-foreground">Loading suppliers...</div>
@@ -282,7 +282,7 @@ export const Suppliers = () => {
               </div>
             </>
           )}
-        </div>
+            </div>
       )}
 
       {/* Current Suppliers */}
@@ -349,8 +349,8 @@ export const Suppliers = () => {
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
+                        )}
+                        </div>
                 );
               })}
             </div>
@@ -360,38 +360,38 @@ export const Suppliers = () => {
 
       {/* Add Supplier */}
       {activeTab === 'add' && (
-        <div className="space-y-4">
+          <div className="space-y-4">
           <h1 className="text-3xl font-heading font-bold tracking-tight">Add New Supplier</h1>
 
           <Card className="border border-border">
             <CardContent className="p-6">
               <form onSubmit={handleAddSupplier} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input
+              <Input
                     label="Supplier ID*"
-                    value={formData.supplier_id}
-                    onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
+                value={formData.supplier_id}
+                onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
                     placeholder="SUPPLIER_001"
-                    required
-                  />
-                  <Input
-                    label="Contact Phone"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                    placeholder="+1-555-0123"
-                  />
-                  <Input
+                required
+              />
+              <Input
+                label="Contact Phone"
+                value={formData.contact_phone}
+                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                placeholder="+1-555-0123"
+              />
+            <Input
                     label="Company Name*"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="TechParts Supply Co."
                     required
-                  />
+            />
 
                   <div className="w-full">
                     <label className="block text-sm font-medium mb-2">Lead Time (days)</label>
-                    <div className="flex items-center gap-2">
-                      <input
+            <div className="flex items-center gap-2">
+              <input
                         type="number"
                         className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         value={formData.lead_time_days}
@@ -405,38 +405,38 @@ export const Suppliers = () => {
                       <Button type="button" variant="outline" size="icon" onClick={leadTimeControls.inc} aria-label="Increase lead time">
                         +
                       </Button>
-                    </div>
-                  </div>
+            </div>
+          </div>
 
-                  <Input
-                    label="Contact Email"
-                    type="email"
-                    value={formData.contact_email}
-                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                    placeholder="orders@company.com"
-                  />
+              <Input
+                label="Contact Email"
+                type="email"
+                value={formData.contact_email}
+                onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                placeholder="orders@company.com"
+              />
 
                   <div className="flex items-center gap-3 pt-7">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="w-4 h-4 rounded border-input"
-                    />
+              <input
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="w-4 h-4 rounded border-input"
+              />
                     <span className="text-sm font-medium">Active</span>
-                  </div>
-                </div>
+            </div>
+          </div>
 
                 <div>
-                  <Button type="submit" className="gap-2">
+            <Button type="submit" className="gap-2">
                     <Plus className="h-4 w-4" />
                     Add Supplier
-                  </Button>
-                </div>
-              </form>
+            </Button>
+          </div>
+        </form>
             </CardContent>
           </Card>
-        </div>
+              </div>
       )}
     </div>
   );

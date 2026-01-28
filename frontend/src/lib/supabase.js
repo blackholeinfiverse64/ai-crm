@@ -19,14 +19,14 @@ let isMockClient = false;
 if (isSupabaseConfigured()) {
   try {
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        storage: window.localStorage,
-        flowType: 'pkce'
-      }
-    })
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    flowType: 'pkce'
+  }
+})
     console.log('Supabase client initialized successfully')
   } catch (error) {
     console.error('Failed to create Supabase client:', error)
