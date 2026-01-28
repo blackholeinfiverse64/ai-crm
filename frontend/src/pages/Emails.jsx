@@ -81,7 +81,7 @@ export const Emails = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold tracking-tight">Email Automation</h1>
+        <h1 className="text-3xl font-heading font-bold tracking-tight">Email Automation</h1>
           <p className="text-muted-foreground mt-1">
             Manage email triggers and automated notifications
           </p>

@@ -71,7 +71,7 @@ export const Learning = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold tracking-tight">RL Learning System</h1>
+        <h1 className="text-3xl font-heading font-bold tracking-tight">RL Learning System</h1>
           <p className="text-muted-foreground mt-1">
             Reinforcement Learning with reward/penalty loops for AI agent optimization
           </p>

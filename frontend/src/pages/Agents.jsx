@@ -172,7 +172,7 @@ export const Agents = () => {
           <Card key={agent.id} className="border-l-4 border-primary/50">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Bot className="h-6 w-6 text-primary" />
                   </div>

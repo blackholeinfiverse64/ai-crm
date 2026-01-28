@@ -121,7 +121,7 @@ export const Reports = () => {
           onClick={() => setSelectedReport('logistics')}
         >
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
               <LineChartIcon className="h-8 w-8 text-success" />
               <div>
                 <h3 className="font-semibold">Logistics Report</h3>

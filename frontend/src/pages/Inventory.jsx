@@ -117,7 +117,7 @@ export const Inventory = () => {
             Monitor stock levels and manage inventory
           </p>
         </div>
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
           <Button variant="outline">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh

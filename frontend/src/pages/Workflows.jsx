@@ -80,7 +80,7 @@ export const Workflows = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold tracking-tight">Automated Workflows</h1>
+        <h1 className="text-3xl font-heading font-bold tracking-tight">Automated Workflows</h1>
           <p className="text-muted-foreground mt-1">
             Manage and monitor automated workflow processes
           </p>

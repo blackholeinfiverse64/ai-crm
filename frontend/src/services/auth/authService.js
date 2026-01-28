@@ -1,8 +1,35 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, isMockSupabase } from '@/lib/supabase'
+
+// Dev mode: allow login without Supabase
+const DEV_MODE_ENABLED = true
 
 export const authService = {
   // Sign up with email and password
   async signUp({ email, password, firstName, lastName, companyName }) {
+    // In dev mode with mock Supabase, simulate success
+    if (isMockSupabase() && DEV_MODE_ENABLED) {
+      console.warn('Dev mode: Simulating signup (Supabase not configured)')
+      return {
+        user: {
+          id: 'dev-user-' + Date.now(),
+          email,
+          user_metadata: {
+            first_name: firstName,
+            last_name: lastName,
+            company_name: companyName,
+            full_name: `${firstName} ${lastName}`
+          }
+        },
+        session: {
+          access_token: 'dev-token',
+          user: {
+            id: 'dev-user-' + Date.now(),
+            email
+          }
+        }
+      }
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -34,6 +61,27 @@ export const authService = {
 
   // Sign in with email and password
   async signIn({ email, password }) {
+    // In dev mode with mock Supabase, simulate successful login
+    if (isMockSupabase() && DEV_MODE_ENABLED) {
+      console.warn('Dev mode: Simulating login (Supabase not configured)')
+      return {
+        user: {
+          id: 'dev-user-' + Date.now(),
+          email,
+          user_metadata: {
+            full_name: 'Dev User'
+          }
+        },
+        session: {
+          access_token: 'dev-token',
+          user: {
+            id: 'dev-user-' + Date.now(),
+            email
+          }
+        }
+      }
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -45,6 +93,11 @@ export const authService = {
 
   // Sign in with OAuth provider
   async signInWithOAuth(provider) {
+    // In dev mode with mock Supabase, show message
+    if (isMockSupabase() && DEV_MODE_ENABLED) {
+      throw new Error('OAuth login requires Supabase configuration. Please configure Supabase or use email/password login in dev mode.')
+    }
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -84,6 +137,9 @@ export const authService = {
 
   // Get current session
   async getSession() {
+    if (isMockSupabase() && DEV_MODE_ENABLED) {
+      return null // No session in dev mode
+    }
     const { data: { session }, error } = await supabase.auth.getSession()
     if (error) throw error
     return session
@@ -91,6 +147,9 @@ export const authService = {
 
   // Get current user
   async getCurrentUser() {
+    if (isMockSupabase() && DEV_MODE_ENABLED) {
+      return null // No user in dev mode
+    }
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error) throw error
     return user
@@ -137,6 +196,17 @@ export const authService = {
 
   // Get user profile
   async getUserProfile(userId) {
+    if (isMockSupabase() && DEV_MODE_ENABLED) {
+      // Return mock profile in dev mode
+      return {
+        id: userId,
+        email: 'dev@example.com',
+        first_name: 'Dev',
+        last_name: 'User',
+        company_name: 'Dev Company'
+      }
+    }
+
     const { data, error } = await supabase
       .from('profiles')
       .select('*')

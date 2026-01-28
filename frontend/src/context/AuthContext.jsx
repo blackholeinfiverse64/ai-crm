@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, isMockSupabase } from '@/lib/supabase';
 import { authService } from '@/services/auth/authService';
 
 const AuthContext = createContext(null);
@@ -87,19 +87,43 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const { user: signedInUser, session: newSession } = await authService.signIn({
+      const result = await authService.signIn({
         email,
         password
       });
       
-      // Get user profile
+      // Handle both mock and real Supabase responses
+      const signedInUser = result?.user || result?.data?.user;
+      const newSession = result?.session || result?.data?.session;
+      
+      // Set user and session
       if (signedInUser) {
-        const userProfile = await authService.getUserProfile(signedInUser.id);
-        setProfile(userProfile);
+        setUser(signedInUser);
+        setSession(newSession);
+        
+        // Get user profile
+        try {
+          const userProfile = await authService.getUserProfile(signedInUser.id);
+          setProfile(userProfile);
+        } catch (profileError) {
+          console.warn('Could not load user profile:', profileError);
+        }
       }
       
       return { user: signedInUser, session: newSession };
     } catch (error) {
+      // In dev mode, if it's a "not configured" error, still allow login
+      if (isMockSupabase() && error.message?.includes('not configured')) {
+        // Create a mock user for dev mode
+        const mockUser = {
+          id: 'dev-user-' + Date.now(),
+          email,
+          user_metadata: { full_name: 'Dev User' }
+        };
+        setUser(mockUser);
+        setSession({ access_token: 'dev-token', user: mockUser });
+        return { user: mockUser, session: { access_token: 'dev-token', user: mockUser } };
+      }
       throw error;
     } finally {
       setLoading(false);
