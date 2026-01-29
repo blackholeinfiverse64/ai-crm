@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Users, TrendingUp, DollarSign, Target, Plus, Search, Filter, 
-  Building2, Phone, Mail, Calendar, Activity, Award, 
+  Building2, Phone, Mail, Calendar, Award, 
   BarChart3, PieChart, Clock, CheckCircle2, AlertCircle,
   UserCheck, FileText, TrendingDown, Briefcase, MapPin,
-  RefreshCw
+  RefreshCw, Brain, MessageSquare, Sparkles, Loader2, CheckCircle, Lightbulb
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
@@ -20,6 +20,7 @@ import { formatDate, formatRelativeTime } from '@/utils/dateUtils';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { crmAPI } from '../services/api/crmAPI';
 import { dashboardAPI } from '../services/api/dashboardAPI';
+import { llmQueryAPI } from '../services/api/llmQueryAPI';
 
 export const CRM = () => {
   const [loading, setLoading] = useState(true);
@@ -28,9 +29,15 @@ export const CRM = () => {
   const [accounts, setAccounts] = useState([]);
   const [leads, setLeads] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
-  const [activities, setActivities] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedAccount, setSelectedAccount] = useState(null);
+  
+  // AI Query state
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiQueryLoading, setAiQueryLoading] = useState(false);
+  const [aiQueryError, setAiQueryError] = useState(null);
+  const [aiQueryHistory, setAiQueryHistory] = useState([]);
+  const [aiQueryResult, setAiQueryResult] = useState(null);
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [accountForm, setAccountForm] = useState({
     name: '',
@@ -182,24 +189,6 @@ export const CRM = () => {
         console.warn('Failed to fetch opportunities:', err);
       }
 
-      // Fetch activities
-      try {
-        const activitiesResponse = await crmAPI.getActivities({ limit: 100 });
-        const activitiesData = activitiesResponse.data?.activities || activitiesResponse.data || [];
-        setActivities(activitiesData.map(act => ({
-          id: act.activity_id || act.id,
-          subject: act.subject || act.activity_subject || '',
-          type: act.activity_type || act.type || 'call',
-          status: act.activity_status || act.status || 'planned',
-          accountId: act.account_id,
-          accountName: act.account_name || '',
-          dueDate: act.due_date ? new Date(act.due_date) : new Date(),
-          assignedTo: act.assigned_to || act.owner || '',
-          outcome: act.outcome || act.result || null
-        })));
-      } catch (err) {
-        console.warn('Failed to fetch activities:', err);
-      }
 
     } catch (err) {
       console.error('Error fetching CRM data:', err);
@@ -236,14 +225,7 @@ export const CRM = () => {
     return variants[status] || 'default';
   };
 
-  const getActivityStatusVariant = (status) => {
-    const variants = {
-      completed: 'success',
-      in_progress: 'warning',
-      planned: 'info',
-    };
-    return variants[status] || 'default';
-  };
+
 
   // Chart data (computed from real data)
   const opportunityStageData = (() => {
@@ -289,8 +271,8 @@ export const CRM = () => {
         return renderLeadsTab();
       case 'opportunities':
         return renderOpportunitiesTab();
-      case 'activities':
-        return renderActivitiesTab();
+      case 'ai-query':
+        return renderAIQueryTab();
       default:
         return renderOverviewTab();
     }
@@ -437,50 +419,6 @@ export const CRM = () => {
         </Card>
       </div>
       
-      {/* Recent Activities */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            Recent Activities
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {activities.slice(0, 5).map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-start gap-4 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-primary/10">
-                  {activity.type === 'call' && <Phone className="h-5 w-5 text-primary" />}
-                  {activity.type === 'meeting' && <Calendar className="h-5 w-5 text-primary" />}
-                  {activity.type === 'email' && <Mail className="h-5 w-5 text-primary" />}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-semibold">{activity.subject}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {activity.accountName} • {activity.assignedTo}
-                      </p>
-                    </div>
-                    <Badge variant={getActivityStatusVariant(activity.status)}>
-                      {activity.status.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                  {activity.outcome && (
-                    <p className="text-sm text-muted-foreground mt-2">{activity.outcome}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Due: {formatDate(activity.dueDate)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 
@@ -732,98 +670,270 @@ export const CRM = () => {
     </div>
   );
 
-  const renderActivitiesTab = () => (
-    <div className="space-y-6">
-      {/* Activity Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <MetricCard
-          title="Total Activities"
-          value="142"
-          icon={Activity}
-          variant="primary"
-        />
-        <MetricCard
-          title="Completed"
-          value="89"
-          icon={CheckCircle2}
-          variant="success"
-        />
-        <MetricCard
-          title="Planned"
-          value="35"
-          icon={Clock}
-          variant="info"
-        />
-        <MetricCard
-          title="In Progress"
-          value="18"
-          icon={AlertCircle}
-          variant="warning"
-        />
-      </div>
+  const renderAIQueryTab = () => {
+    const exampleQueries = [
+      'Show me all opportunities closing this month',
+      'What are the pending tasks for TechCorp?',
+      'Show me leads from website that are not converted',
+      'Give me account summary for Acme Corp',
+      'What is the pipeline analysis?',
+      'Show recent activities',
+    ];
 
-      {/* Activities Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Activity Timeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Activity ID</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Outcome</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {activities.map((activity) => (
-                <TableRow key={activity.id}>
-                  <TableCell className="font-medium">{activity.id}</TableCell>
-                  <TableCell className="font-semibold">{activity.subject}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{activity.type}</Badge>
-                  </TableCell>
-                  <TableCell>{activity.accountName}</TableCell>
-                  <TableCell>
-                    <Badge variant={getActivityStatusVariant(activity.status)}>
-                      {activity.status.replace('_', ' ')}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{formatDate(activity.dueDate)}</TableCell>
-                  <TableCell>{activity.assignedTo}</TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {activity.outcome || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm">
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  );
+    const handleAIQuery = async () => {
+      if (!aiQuery.trim()) return;
+
+      try {
+        setAiQueryLoading(true);
+        setAiQueryError(null);
+        setAiQueryResult(null);
+
+        const response = await llmQueryAPI.processQuery(aiQuery);
+        const result = response.data;
+
+        setAiQueryResult(result);
+        
+        // Add to history
+        setAiQueryHistory(prev => [{
+          id: Date.now(),
+          query: aiQuery,
+          timestamp: new Date(),
+          result: result
+        }, ...prev].slice(0, 10)); // Keep last 10 queries
+
+        setAiQuery('');
+      } catch (err) {
+        console.error('Error processing query:', err);
+        setAiQueryError(err.response?.data?.detail || err.message || 'Failed to process query');
+      } finally {
+        setAiQueryLoading(false);
+      }
+    };
+
+    const handleExampleClick = (exampleQuery) => {
+      setAiQuery(exampleQuery);
+    };
+
+    const renderQueryResult = () => {
+      if (!aiQueryResult) return null;
+
+      const result = aiQueryResult.result || {};
+      const naturalResponse = aiQueryResult.natural_response || '';
+      const queryType = result.query_type || 'unknown';
+      const data = result.data || [];
+
+      return (
+        <div className="space-y-4">
+          {/* Natural Language Response */}
+          {naturalResponse && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  AI Response
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-foreground whitespace-pre-wrap">{naturalResponse}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Query Result Data */}
+          {Array.isArray(data) && data.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  Results ({data.length} {data.length === 1 ? 'item' : 'items'})
+                  <Badge variant="outline" className="ml-2">
+                    {queryType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    {Object.keys(data[0] || {}).length > 0 && (
+                      <TableRow>
+                        {Object.keys(data[0]).map((key) => (
+                          <TableHead key={key}>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</TableHead>
+                        ))}
+                      </TableRow>
+                    )}
+                  </TableHeader>
+                  <TableBody>
+                    {data.map((item, index) => (
+                      <TableRow key={index}>
+                        {Object.entries(item).map(([key, value]) => (
+                          <TableCell key={key}>
+                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Object Result */}
+          {!Array.isArray(data) && typeof data === 'object' && Object.keys(data).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  Query Result
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="bg-muted p-4 rounded-lg overflow-auto text-sm">
+                  {JSON.stringify(data, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* No Results */}
+          {(!data || (Array.isArray(data) && data.length === 0) || (typeof data === 'object' && Object.keys(data).length === 0)) && (
+            <Card>
+              <CardContent className="pt-6 text-center py-12">
+                <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No data found for your query.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Error Alert */}
+        {aiQueryError && (
+          <Alert variant="destructive" onClose={() => setAiQueryError(null)}>
+            <AlertCircle className="h-4 w-4 mr-2" />
+            {aiQueryError}
+          </Alert>
+        )}
+
+        {/* Query Input */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              Natural Language Query
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Ask a question about your CRM data... (e.g., Show me all opportunities closing this month)"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && !aiQueryLoading && handleAIQuery()}
+                icon={Search}
+                className="flex-1"
+              />
+              <Button onClick={handleAIQuery} disabled={aiQueryLoading || !aiQuery.trim()}>
+                {aiQueryLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4 mr-2" />
+                    Query
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Example Queries */}
+            <div>
+              <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                <Lightbulb className="h-4 w-4" />
+                Example queries:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {exampleQueries.map((example, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExampleClick(example)}
+                    className="text-xs"
+                  >
+                    {example}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Loading State */}
+        {aiQueryLoading && (
+          <Card>
+            <CardContent className="pt-6 text-center py-12">
+              <Loader2 className="h-8 w-8 mx-auto animate-spin text-primary mb-4" />
+              <p className="text-muted-foreground">Processing your query...</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Query Results */}
+        {!aiQueryLoading && aiQueryResult && renderQueryResult()}
+
+        {/* Query History */}
+        {aiQueryHistory.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Recent Queries
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {aiQueryHistory.map((historyItem) => (
+                  <div
+                    key={historyItem.id}
+                    className="p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setAiQuery(historyItem.query);
+                      setAiQueryResult(historyItem.result);
+                    }}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium">{historyItem.query}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {historyItem.timestamp.toLocaleString()}
+                        </p>
+                      </div>
+                      {historyItem.result?.result?.success && (
+                        <CheckCircle className="h-4 w-4 text-success" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold tracking-tight">🏢 CRM Dashboard </h1>
+          <h1 className="text-3xl font-heading font-bold tracking-tight">CRM Dashboard</h1>
           <p className="text-muted-foreground mt-1">
             Comprehensive customer relationship management system
           </p>
@@ -903,15 +1013,15 @@ export const CRM = () => {
           Opportunities
         </button>
         <button
-          onClick={() => setActiveTab('activities')}
+          onClick={() => setActiveTab('ai-query')}
           className={`px-4 py-2 font-medium transition-colors border-b-2 ${
-            activeTab === 'activities'
+            activeTab === 'ai-query'
               ? 'border-primary text-primary'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Activity className="h-4 w-4 inline mr-2" />
-          Activities
+          <Brain className="h-4 w-4 inline mr-2" />
+          AI Query
         </button>
       </div>
 

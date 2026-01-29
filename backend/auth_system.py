@@ -364,15 +364,15 @@ if __name__ == "__main__":
     print("\n🔑 Testing login:")
     try:
         token = auth_system.login(UserLogin(username="admin", password="admin123"))
-        print(f"✅ Admin login successful")
+        print(f"Admin login successful")
         print(f"   Access token: {token.access_token[:50]}...")
         
         # Test token verification
         payload = auth_system.verify_token(token.access_token)
-        print(f"✅ Token verification successful")
+        print(f"Token verification successful")
         print(f"   User: {payload['sub']}, Role: {payload['role']}")
         
     except Exception as e:
-        print(f"❌ Login test failed: {e}")
+        print(f"Login test failed: {e}")
     
-    print("\n🚀 Authentication system ready!")
+    print("\nAuthentication system ready!")

@@ -78,7 +78,7 @@ export const Suppliers = () => {
         throw new Error(errorData.detail || 'Failed to create supplier');
       }
       
-      setSuccess('✅ Supplier created successfully!');
+      setSuccess('Supplier created successfully!');
       resetForm();
       loadSuppliers();
       setActiveTab('current');

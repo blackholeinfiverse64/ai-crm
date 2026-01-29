@@ -158,7 +158,7 @@ visit_tracker = VisitTracker(google_maps)
 @crm_app.on_event("startup")
 async def startup_event():
     create_tables()
-    print("✅ CRM Database initialized")
+    print("CRM Database initialized")
 
 @crm_app.get("/")
 def read_root():
@@ -782,8 +782,8 @@ if __name__ == "__main__":
     print("CRM API: http://localhost:8001")
     print("CRM Docs: http://localhost:8001/docs")
 =======
-    print("🚀 Starting CRM API Server...")
-    print("🌐 CRM API: http://localhost:8001")
-    print("📊 CRM Docs: http://localhost:8001/docs")
+    print("Starting CRM API Server...")
+    print("CRM API: http://localhost:8001")
+    print("CRM Docs: http://localhost:8001/docs")
 >>>>>>> 9a5d7abfa61aa2769341197651d91d368bfed338
     uvicorn.run(crm_app, host="0.0.0.0", port=8001)

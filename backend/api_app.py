@@ -186,6 +186,7 @@ INFIVERSE_BASE_URL = os.getenv("INFIVERSE_BASE_URL", "http://localhost:5000")
 
 # Add CORS middleware with security considerations
 # Allow frontend origins (Vite default ports + configured port)
+# For development, allow all localhost origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -197,23 +198,29 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "http://127.0.0.1:8000",  # Backend itself
+        "http://localhost:8000",  # Backend itself
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all headers
 )
 
 # Mount static files for product images
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Security headers middleware
+# Security headers middleware (runs after CORS)
 @app.middleware("http")
-async def add_security_headers(request, call_next):
+async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Only add security headers if it's not a CORS preflight request
+    # and if the response doesn't already have CORS headers set by the middleware
+    if request.method != "OPTIONS" and "Access-Control-Allow-Origin" not in response.headers:
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
 # Initialize integrations
@@ -708,7 +715,7 @@ def run_notification_system():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/dashboard/charts")
-def get_dashboard_charts():
+def get_dashboard_charts(current_user: User = Depends(get_current_user)):
     """Get dashboard charts data"""
     try:
         with DatabaseService() as db_service:
@@ -954,6 +961,11 @@ def create_account(account: AccountCreate, current_user: User = Depends(require_
             return crm_service.create_account(account.dict())
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.options("/accounts")
+def options_accounts():
+    """Handle CORS preflight for accounts endpoint"""
+    return {"message": "OK"}
 
 @app.get("/accounts", response_model=dict)
 def get_accounts(

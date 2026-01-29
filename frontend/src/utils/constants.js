@@ -20,6 +20,7 @@ export const ROUTES = {
   SETTINGS: '/settings',
   USERS: '/users',
   SHOWCASE: '/showcase',
+  AI_QUERY: '/ai-query',
 };
 
 export const STATUS_COLORS = {

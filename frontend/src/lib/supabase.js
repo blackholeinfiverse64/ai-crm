@@ -34,7 +34,7 @@ if (isSupabaseConfigured()) {
   }
 } else {
   // Create a mock client for development
-  console.warn('⚠️ Supabase not configured. Using mock client for development.')
+  console.warn('Supabase not configured. Using mock client for development.')
   isMockClient = true
 }
 

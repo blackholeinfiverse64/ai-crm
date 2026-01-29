@@ -40,7 +40,7 @@ const AuthLayout = ({ children, title, subtitle }) => {
               
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl gradient-secondary flex items-center justify-center">
-                  <span className="text-2xl">📊</span>
+                  <span className="text-2xl">AI</span>
                 </div>
                 <div>
                   <h3 className="font-semibold">Real-time Analytics</h3>
