@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   UsersRound, Activity, Clock, TrendingUp, Award, 
   Calendar, CheckCircle, XCircle, AlertTriangle, RefreshCw,
-  Eye, EyeOff, Shield, BarChart3, ClockIn, ClockOut, Save
+  Eye, EyeOff, Shield, BarChart3, LogIn, LogOut, Save
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
@@ -212,11 +212,11 @@ export const Infiverse = () => {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Button onClick={handleCheckIn} className="h-20" disabled={loading}>
-          <ClockIn className="h-5 w-5 mr-2" />
+          <LogIn className="h-5 w-5 mr-2" />
           Check In
         </Button>
         <Button onClick={handleCheckOut} variant="outline" className="h-20" disabled={loading}>
-          <ClockOut className="h-5 w-5 mr-2" />
+          <LogOut className="h-5 w-5 mr-2" />
           Check Out
         </Button>
       </div>
