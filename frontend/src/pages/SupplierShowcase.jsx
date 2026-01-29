@@ -1,86 +1,130 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Store, Grid, List, Search, Filter, Download,
-  Mail, Package, FileText, Eye, ShoppingCart
+  Mail, Package, FileText, Eye, ShoppingCart, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import Button from '../components/common/ui/Button';
 import Input from '../components/common/forms/Input';
 import Badge from '../components/common/ui/Badge';
+import Alert from '../components/common/ui/Alert';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { Modal, ModalFooter } from '../components/common/ui/Modal';
 import { productAPI } from '../services/api/productAPI';
 
 export const SupplierShowcase = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
 
-  const mockProducts = [
-    {
-      id: 'PROD-001',
-      name: 'Wireless Mouse',
-      category: 'Electronics',
-      price: 29.99,
-      stock: 150,
-      image: 'https://via.placeholder.com/300',
-      supplier: 'TechParts Inc',
-      weight: 0.1,
-      dimensions: '10x5x3 cm',
-      description: 'Ergonomic wireless mouse with precision tracking',
-    },
-    {
-      id: 'PROD-002',
-      name: 'Mechanical Keyboard',
-      category: 'Electronics',
-      price: 89.99,
-      stock: 45,
-      image: 'https://via.placeholder.com/300',
-      supplier: 'TechParts Inc',
-      weight: 0.8,
-      dimensions: '45x15x3 cm',
-      description: 'RGB mechanical keyboard with cherry switches',
-    },
-    {
-      id: 'PROD-003',
-      name: 'USB-C Cable',
-      category: 'Accessories',
-      price: 12.99,
-      stock: 200,
-      image: 'https://via.placeholder.com/300',
-      supplier: 'CableCo',
-      weight: 0.05,
-      dimensions: '1m length',
-      description: 'High-speed USB-C charging cable',
-    },
-  ];
+  // Fetch products from API
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  useEffect(() => {
-    setTimeout(() => {
+      // Fetch products
+      const productsResponse = await productAPI.getProducts({ limit: 1000, is_active: true });
+      const productsData = productsResponse.data?.products || productsResponse.data || [];
+      
+      // Transform products to match frontend format
+      const formattedProducts = productsData.map(product => ({
+        id: product.ProductID || product.product_id || product.id,
+        name: product.ProductName || product.product_name || product.name || 'Unknown Product',
+        category: product.Category || product.category || 'Uncategorized',
+        price: parseFloat(product.UnitPrice || product.unit_price || product.price || 0),
+        stock: product.CurrentStock || product.current_stock || product.stock || 0,
+        image: product.PrimaryImageURL || product.primary_image_url || product.image || 'https://via.placeholder.com/300',
+        supplier: product.SupplierName || product.supplier_name || product.supplier || 'Unknown Supplier',
+        weight: parseFloat(product.Weight || product.weight || 0),
+        dimensions: product.Dimensions || product.dimensions || 'N/A',
+        description: product.Description || product.description || 'No description available',
+      }));
+
+      setProducts(formattedProducts);
+
+      // Fetch categories
+      try {
+        const categoriesResponse = await productAPI.getCategories();
+        const categoriesData = categoriesResponse.data?.categories || categoriesResponse.data || [];
+        setCategories(categoriesData);
+      } catch (err) {
+        console.warn('Failed to fetch categories:', err);
+        // Extract unique categories from products
+        const uniqueCategories = [...new Set(formattedProducts.map(p => p.category))];
+        setCategories(uniqueCategories);
+      }
+
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load products');
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   }, []);
 
-  const filteredProducts = mockProducts.filter(product => {
-    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
-    const matchesSupplier = supplierFilter === 'all' || product.supplier === supplierFilter;
-    return matchesCategory && matchesSupplier;
-  });
+  useEffect(() => {
+    fetchProducts();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchProducts();
+    }, 30000);
 
-  if (loading) {
-    return <LoadingSpinner text="Loading product showcase..." />;
-  }
+    return () => clearInterval(interval);
+  }, [fetchProducts]);
+
+  // Get unique suppliers from products
+  const suppliers = useMemo(() => {
+    const uniqueSuppliers = [...new Set(products.map(p => p.supplier))];
+    return uniqueSuppliers.sort();
+  }, [products]);
+
+  // Filter products based on search, category, and supplier
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const matchesSearch = !searchQuery || 
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+      const matchesSupplier = supplierFilter === 'all' || product.supplier === supplierFilter;
+      return matchesSearch && matchesCategory && matchesSupplier;
+    });
+  }, [products, searchQuery, categoryFilter, supplierFilter]);
+
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Heading */}
-      <div>
-        <h1 className="text-3xl font-heading font-bold tracking-tight">Supplier Showcase</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-heading font-bold tracking-tight">Supplier Showcase</h1>
+          <p className="text-muted-foreground mt-1">
+            Browse products from all suppliers
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchProducts}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Filters */}
       <Card>
@@ -91,6 +135,8 @@ export const SupplierShowcase = () => {
                 placeholder="Search products..."
                 icon={Search}
                 className="flex-1"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
               <select
                 value={categoryFilter}
@@ -98,9 +144,9 @@ export const SupplierShowcase = () => {
                 className="px-4 py-2 rounded-lg border border-border bg-background"
               >
                 <option value="all">All Categories</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Accessories">Accessories</option>
-                <option value="Furniture">Furniture</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
               </select>
               <select
                 value={supplierFilter}
@@ -108,8 +154,9 @@ export const SupplierShowcase = () => {
                 className="px-4 py-2 rounded-lg border border-border bg-background"
               >
                 <option value="all">All Suppliers</option>
-                <option value="TechParts Inc">TechParts Inc</option>
-                <option value="CableCo">CableCo</option>
+                {suppliers.map(supplier => (
+                  <option key={supplier} value={supplier}>{supplier}</option>
+                ))}
               </select>
               <Button variant="outline">
                 <Filter className="h-4 w-4 mr-2" />
@@ -136,8 +183,24 @@ export const SupplierShowcase = () => {
         </CardContent>
       </Card>
 
+      {/* Products Count */}
+      {!loading && (
+        <div className="text-sm text-muted-foreground">
+          Showing {filteredProducts.length} of {products.length} products
+        </div>
+      )}
+
       {/* Products Grid */}
-      {viewMode === 'grid' ? (
+      {loading ? (
+        <LoadingSpinner text="Loading product showcase..." />
+      ) : filteredProducts.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6 text-center py-12">
+            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No products found matching your filters.</p>
+          </CardContent>
+        </Card>
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => (
             <Card key={product.id} hover className="overflow-hidden">
@@ -156,21 +219,29 @@ export const SupplierShowcase = () => {
                 <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Supplier:</span>
+                    <span className="font-medium">{product.supplier}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Price:</span>
-                    <span className="text-2xl font-bold">${product.price}</span>
+                    <span className="text-2xl font-bold">{product.price.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Stock:</span>
                     <span className="font-medium">{product.stock} units</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Weight:</span>
-                    <span className="font-medium">{product.weight} kg</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Dimensions:</span>
-                    <span className="font-medium">{product.dimensions}</span>
-                  </div>
+                  {product.weight > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Weight:</span>
+                      <span className="font-medium">{product.weight} kg</span>
+                    </div>
+                  )}
+                  {product.dimensions && product.dimensions !== 'N/A' && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Dimensions:</span>
+                      <span className="font-medium">{product.dimensions}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <Button 
@@ -218,13 +289,16 @@ export const SupplierShowcase = () => {
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-xl font-semibold">{product.name}</h3>
-                      <span className="text-2xl font-bold">${product.price}</span>
+                      <span className="text-2xl font-bold">{product.price.toFixed(2)}</span>
                     </div>
                     <p className="text-muted-foreground mb-3">{product.description}</p>
-                    <div className="flex items-center gap-4 text-sm mb-4">
+                    <div className="flex items-center gap-4 text-sm mb-4 flex-wrap">
+                      <span><strong>Supplier:</strong> {product.supplier}</span>
                       <span><strong>Stock:</strong> {product.stock} units</span>
-                      <span><strong>Weight:</strong> {product.weight} kg</span>
-                      <span><strong>Dimensions:</strong> {product.dimensions}</span>
+                      {product.weight > 0 && <span><strong>Weight:</strong> {product.weight} kg</span>}
+                      {product.dimensions && product.dimensions !== 'N/A' && (
+                        <span><strong>Dimensions:</strong> {product.dimensions}</span>
+                      )}
                       <Badge>{product.category}</Badge>
                     </div>
                     <div className="flex items-center gap-2">
@@ -278,21 +352,33 @@ export const SupplierShowcase = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <span className="text-sm text-muted-foreground">Supplier:</span>
+                <p className="font-semibold">{selectedProduct.supplier}</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Category:</span>
+                <p className="font-semibold">{selectedProduct.category}</p>
+              </div>
+              <div>
                 <span className="text-sm text-muted-foreground">Price:</span>
-                <p className="font-semibold text-xl">${selectedProduct.price}</p>
+                <p className="font-semibold text-xl">{selectedProduct.price.toFixed(2)}</p>
               </div>
               <div>
                 <span className="text-sm text-muted-foreground">Stock:</span>
                 <p className="font-semibold">{selectedProduct.stock} units</p>
               </div>
-              <div>
-                <span className="text-sm text-muted-foreground">Weight:</span>
-                <p className="font-semibold">{selectedProduct.weight} kg</p>
-              </div>
-              <div>
-                <span className="text-sm text-muted-foreground">Dimensions:</span>
-                <p className="font-semibold">{selectedProduct.dimensions}</p>
-              </div>
+              {selectedProduct.weight > 0 && (
+                <div>
+                  <span className="text-sm text-muted-foreground">Weight:</span>
+                  <p className="font-semibold">{selectedProduct.weight} kg</p>
+                </div>
+              )}
+              {selectedProduct.dimensions && selectedProduct.dimensions !== 'N/A' && (
+                <div>
+                  <span className="text-sm text-muted-foreground">Dimensions:</span>
+                  <p className="font-semibold">{selectedProduct.dimensions}</p>
+                </div>
+              )}
             </div>
           </div>
           <ModalFooter>

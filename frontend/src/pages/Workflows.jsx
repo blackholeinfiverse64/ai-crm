@@ -1,66 +1,123 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Workflow, Play, Pause, Plus, Settings, CheckCircle, 
-  Clock, AlertCircle, Zap, TrendingUp
+  Clock, AlertCircle, Zap, TrendingUp, RefreshCw
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Badge from '../components/common/ui/Badge';
+import Alert from '../components/common/ui/Alert';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { formatDate, formatRelativeTime } from '@/utils/dateUtils';
+import { logisticsAPI } from '../services/api/logisticsAPI';
 
 export const Workflows = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [workflows, setWorkflows] = useState([]);
+  const [executionHistory, setExecutionHistory] = useState([]);
+  const [metrics, setMetrics] = useState({
+    totalWorkflows: 0,
+    activeWorkflows: 0,
+    executedToday: 0,
+    successRate: 0,
+  });
 
-  const metrics = {
-    totalWorkflows: 12,
-    activeWorkflows: 8,
-    executedToday: 45,
-    successRate: 94.2,
-  };
+  // Fetch workflow data from agent logs
+  const fetchWorkflows = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockWorkflows = [
-    {
-      id: 'WF-001',
-      name: 'Automated Restock Workflow',
-      description: 'Automatically creates restock requests when inventory is low',
-      status: 'active',
-      trigger: 'Low Stock Alert',
-      lastRun: new Date(Date.now() - 3600000),
-      executions: 156,
-      successRate: 96.5,
-    },
-    {
-      id: 'WF-002',
-      name: 'Order Processing Workflow',
-      description: 'Processes new orders and creates shipments',
-      status: 'active',
-      trigger: 'New Order Created',
-      lastRun: new Date(Date.now() - 1800000),
-      executions: 234,
-      successRate: 98.2,
-    },
-    {
-      id: 'WF-003',
-      name: 'Supplier Notification Workflow',
-      description: 'Sends notifications to suppliers for purchase orders',
-      status: 'paused',
-      trigger: 'Purchase Order Created',
-      lastRun: new Date(Date.now() - 86400000),
-      executions: 89,
-      successRate: 92.1,
-    },
-  ];
+      // Fetch agent logs to create workflow-like data
+      const logsResponse = await logisticsAPI.getAgentLogs({ limit: 100 });
+      const logs = logsResponse.data?.logs || logsResponse.data || [];
+
+      // Group logs by action type to create workflows
+      const workflowMap = {};
+      logs.forEach(log => {
+        const actionType = log.action || 'Unknown';
+        if (!workflowMap[actionType]) {
+          workflowMap[actionType] = {
+            id: `WF-${Object.keys(workflowMap).length + 1}`,
+            name: `${actionType} Workflow`,
+            description: `Automated workflow for ${actionType.toLowerCase()}`,
+            status: 'active',
+            trigger: actionType,
+            lastRun: log.timestamp ? new Date(log.timestamp) : new Date(),
+            executions: 0,
+            successRate: 0,
+            logs: []
+          };
+        }
+        workflowMap[actionType].executions++;
+        workflowMap[actionType].logs.push(log);
+        if (log.timestamp && new Date(log.timestamp) > new Date(workflowMap[actionType].lastRun)) {
+          workflowMap[actionType].lastRun = new Date(log.timestamp);
+        }
+      });
+
+      // Calculate success rates
+      Object.values(workflowMap).forEach(workflow => {
+        const successful = workflow.logs.filter(l => l.confidence > 0.7).length;
+        workflow.successRate = workflow.executions > 0 
+          ? Math.round((successful / workflow.executions) * 100 * 10) / 10 
+          : 0;
+      });
+
+      const workflowsList = Object.values(workflowMap).slice(0, 10);
+      setWorkflows(workflowsList);
+
+      // Create execution history from recent logs
+      const recentLogs = logs.slice(0, 20).map(log => ({
+        workflow: `${log.action || 'Unknown'} Workflow`,
+        trigger: log.action || 'Unknown',
+        status: log.confidence > 0.7 ? 'success' : 'warning',
+        executionTime: '2.3s',
+        timestamp: log.timestamp ? new Date(log.timestamp) : new Date()
+      }));
+      setExecutionHistory(recentLogs);
+
+      // Calculate metrics
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayExecutions = logs.filter(l => {
+        const logDate = l.timestamp ? new Date(l.timestamp) : new Date();
+        return logDate >= today;
+      }).length;
+
+      const totalSuccessful = logs.filter(l => l.confidence > 0.7).length;
+      const successRate = logs.length > 0 ? Math.round((totalSuccessful / logs.length) * 100 * 10) / 10 : 0;
+
+      setMetrics({
+        totalWorkflows: workflowsList.length,
+        activeWorkflows: workflowsList.filter(w => w.status === 'active').length,
+        executedToday: todayExecutions,
+        successRate,
+      });
+
+    } catch (err) {
+      console.error('Error fetching workflows:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load workflows');
+      // Fallback to empty workflows
+      setWorkflows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      setWorkflows(mockWorkflows);
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchWorkflows();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchWorkflows();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchWorkflows]);
 
   const getStatusVariant = (status) => {
     const variants = {
@@ -80,16 +137,30 @@ export const Workflows = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-        <h1 className="text-3xl font-heading font-bold tracking-tight">Automated Workflows</h1>
+          <h1 className="text-3xl font-heading font-bold tracking-tight">Automated Workflows</h1>
           <p className="text-muted-foreground mt-1">
             Manage and monitor automated workflow processes
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Workflow
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchWorkflows}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Workflow
+          </Button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertCircle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -199,34 +270,30 @@ export const Workflows = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Automated Restock Workflow</TableCell>
-                <TableCell>Low Stock Alert</TableCell>
-                <TableCell>
-                  <Badge variant="success">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Success
-                  </Badge>
-                </TableCell>
-                <TableCell>2.3s</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatRelativeTime(new Date(Date.now() - 3600000))}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">Order Processing Workflow</TableCell>
-                <TableCell>New Order Created</TableCell>
-                <TableCell>
-                  <Badge variant="success">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Success
-                  </Badge>
-                </TableCell>
-                <TableCell>1.8s</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatRelativeTime(new Date(Date.now() - 1800000))}
-                </TableCell>
-              </TableRow>
+              {executionHistory.length > 0 ? (
+                executionHistory.map((execution, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{execution.workflow}</TableCell>
+                    <TableCell>{execution.trigger}</TableCell>
+                    <TableCell>
+                      <Badge variant={execution.status === 'success' ? 'success' : 'warning'}>
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        {execution.status === 'success' ? 'Success' : 'Warning'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{execution.executionTime}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatRelativeTime(execution.timestamp)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No execution history available
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

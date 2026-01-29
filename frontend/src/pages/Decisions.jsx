@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Brain, Zap, TrendingUp, Target, Play, Settings,
   Route, Package, BarChart3, Clock,
-  CheckSquare, Wrench, Heart, Save, Rocket
+  CheckSquare, Wrench, Heart, Save, Rocket, RefreshCw, AlertCircle
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
@@ -10,6 +10,7 @@ import Button from '../components/common/ui/Button';
 import Input from '../components/common/forms/Input';
 import Select from '../components/common/forms/Select';
 import Badge from '../components/common/ui/Badge';
+import { Alert } from '../components/common/ui/Alert';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { Modal, ModalFooter } from '../components/common/ui/Modal';
@@ -18,10 +19,17 @@ import { formatDate, formatRelativeTime } from '@/utils/dateUtils';
 
 export const Decisions = () => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('make'); // make, workflows, analytics, settings
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('make');
   const [decisionHistory, setDecisionHistory] = useState([]);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [decisionType, setDecisionType] = useState('route_optimization');
+  const [metrics, setMetrics] = useState({
+    totalDecisions: 0,
+    avgConfidence: 0,
+    successRate: 0,
+    avgExecutionTime: '0s',
+  });
   
   // Workflow form state
   const [workflowForm, setWorkflowForm] = useState({
@@ -35,7 +43,7 @@ export const Decisions = () => {
       '[{"item_id": "item_A", "sales": [20, 25, 22]}, {"item_id": "item_B", "sales": [15, 18, 16]}]'
   });
 
-  // Settings state (UI only for now)
+  // Settings state
   const [capabilities, setCapabilities] = useState({
     routeOptimization: true,
     procurementDecisions: true,
@@ -48,26 +56,70 @@ export const Decisions = () => {
   const [autoExecuteHighConfidence, setAutoExecuteHighConfidence] = useState(false);
   const [enableDecisionNotifications, setEnableDecisionNotifications] = useState(true);
 
-  const metrics = {
-    totalDecisions: 1248,
-    avgConfidence: 87.5,
-    successRate: 92.3,
-    avgExecutionTime: '3.2s',
-  };
+  // Fetch decision data
+  const fetchDecisionData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockHistory = [
-    { id: 1, type: 'Route Optimization', confidence: 92.5, status: 'success', timestamp: new Date(Date.now() - 3600000) },
-    { id: 2, type: 'Procurement Decision', confidence: 88.3, status: 'success', timestamp: new Date(Date.now() - 7200000) },
-    { id: 3, type: 'Inventory Forecast', confidence: 85.7, status: 'success', timestamp: new Date(Date.now() - 10800000) },
-    { id: 4, type: 'Supplier Selection', confidence: 91.2, status: 'success', timestamp: new Date(Date.now() - 14400000) },
-  ];
+      // Fetch decision history
+      try {
+        const historyResponse = await aiDecisionsAPI.getDecisionHistory({ limit: 100 });
+        const historyData = historyResponse.data?.history || historyResponse.data || [];
+        setDecisionHistory(historyData.map(decision => ({
+          id: decision.id || decision.decision_id,
+          type: decision.decision_type || decision.type || 'Unknown',
+          confidence: parseFloat(decision.confidence || decision.confidence_score || 0) * 100,
+          status: decision.status || 'success',
+          timestamp: decision.timestamp ? new Date(decision.timestamp) : new Date(),
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch decision history:', err);
+      }
+
+      // Fetch analytics for metrics
+      try {
+        const analyticsResponse = await aiDecisionsAPI.getDecisionAnalytics();
+        const analytics = analyticsResponse.data || {};
+        setMetrics({
+          totalDecisions: analytics.total_decisions || decisionHistory.length || 0,
+          avgConfidence: Math.round((analytics.avg_confidence || 0) * 100 * 10) / 10,
+          successRate: Math.round((analytics.success_rate || 0) * 100 * 10) / 10,
+          avgExecutionTime: analytics.avg_execution_time || '3.2s',
+        });
+      } catch (err) {
+        console.warn('Failed to fetch analytics:', err);
+        // Calculate from history
+        if (decisionHistory.length > 0) {
+          const avgConf = decisionHistory.reduce((sum, d) => sum + d.confidence, 0) / decisionHistory.length;
+          const successful = decisionHistory.filter(d => d.status === 'success').length;
+          setMetrics({
+            totalDecisions: decisionHistory.length,
+            avgConfidence: Math.round(avgConf * 10) / 10,
+            successRate: Math.round((successful / decisionHistory.length) * 100 * 10) / 10,
+            avgExecutionTime: '3.2s',
+          });
+        }
+      }
+
+    } catch (err) {
+      console.error('Error fetching decision data:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load decision data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      setDecisionHistory(mockHistory);
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchDecisionData();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchDecisionData();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchDecisionData]);
 
   const orderValueControls = useMemo(() => {
     const dec = () => setWorkflowForm(p => ({ ...p, orderValue: Math.max(0, (p.orderValue || 0) - 1) }));
@@ -77,11 +129,17 @@ export const Decisions = () => {
 
   const handleStartWorkflow = async () => {
     try {
-      // API call to start workflow
-      console.log('Starting workflow:', workflowForm);
-      // await aiDecisionsAPI.startWorkflow(workflowForm);
+      setLoading(true);
+      await aiDecisionsAPI.executeWorkflow(workflowForm.workflowType, workflowForm);
+      // Refresh data after workflow execution
+      setTimeout(() => {
+        fetchDecisionData();
+      }, 2000);
     } catch (error) {
       console.error('Error starting workflow:', error);
+      setError(error.response?.data?.detail || error.message || 'Failed to start workflow');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -94,16 +152,30 @@ export const Decisions = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-        <h1 className="text-3xl font-heading font-bold tracking-tight">AI Decision Engine</h1>
+          <h1 className="text-3xl font-heading font-bold tracking-tight">AI Decision Engine</h1>
           <p className="text-muted-foreground mt-1">
             Intelligent decision-making for logistics operations
           </p>
         </div>
-        <Button onClick={() => setShowDecisionModal(true)}>
-          <Play className="h-4 w-4 mr-2" />
-          Make Decision
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchDecisionData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={() => setShowDecisionModal(true)}>
+            <Play className="h-4 w-4 mr-2" />
+            Make Decision
+          </Button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertCircle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

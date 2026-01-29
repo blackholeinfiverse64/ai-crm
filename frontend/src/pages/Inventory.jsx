@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ShoppingCart, AlertTriangle, TrendingUp, TrendingDown, 
   Plus, Search, Filter, RefreshCw, Package
@@ -8,80 +8,108 @@ import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Input from '../components/common/forms/Input';
 import Badge from '../components/common/ui/Badge';
+import { Alert } from '../components/common/ui/Alert';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
-import { Alert } from '../components/common/ui/Alert';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { inventoryAPI } from '../services/api/inventoryAPI';
 
 export const Inventory = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [metrics, setMetrics] = useState({
+    totalItems: 0,
+    inStock: 0,
+    lowStock: 0,
+    outOfStock: 0,
+    totalValue: 0,
+  });
 
-  const metrics = {
-    totalItems: 1248,
-    inStock: 1102,
-    lowStock: 89,
-    outOfStock: 57,
-    totalValue: 245000,
-  };
+  // Fetch inventory data
+  const fetchInventoryData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockInventory = [
-    { 
-      id: 'INV-001', 
-      productName: 'Wireless Mouse', 
-      productId: 'PROD-001',
-      currentStock: 150, 
-      reorderPoint: 50,
-      unitCost: 15.50,
-      totalValue: 2325,
-      status: 'in_stock',
-      lastRestocked: new Date(Date.now() - 86400000)
-    },
-    { 
-      id: 'INV-002', 
-      productName: 'Mechanical Keyboard', 
-      productId: 'PROD-002',
-      currentStock: 45, 
-      reorderPoint: 30,
-      unitCost: 45.00,
-      totalValue: 2025,
-      status: 'in_stock',
-      lastRestocked: new Date(Date.now() - 172800000)
-    },
-    { 
-      id: 'INV-003', 
-      productName: 'USB-C Cable', 
-      productId: 'PROD-003',
-      currentStock: 5, 
-      reorderPoint: 20,
-      unitCost: 8.00,
-      totalValue: 40,
-      status: 'low_stock',
-      lastRestocked: new Date(Date.now() - 259200000)
-    },
-    { 
-      id: 'INV-004', 
-      productName: 'Monitor Stand', 
-      productId: 'PROD-004',
-      currentStock: 0, 
-      reorderPoint: 10,
-      unitCost: 25.00,
-      totalValue: 0,
-      status: 'out_of_stock',
-      lastRestocked: new Date(Date.now() - 345600000)
-    },
-  ];
+      // Fetch inventory
+      const inventoryResponse = await inventoryAPI.getInventory();
+      const inventoryData = inventoryResponse.data?.inventory || inventoryResponse.data || [];
+      
+      // Fetch low stock items
+      let lowStockData = [];
+      try {
+        const lowStockResponse = await inventoryAPI.getLowStock();
+        lowStockData = lowStockResponse.data?.low_stock_items || lowStockResponse.data || [];
+      } catch (err) {
+        console.warn('Failed to fetch low stock:', err);
+      }
+
+      // Transform inventory data
+      const formattedInventory = inventoryData.map(item => {
+        const currentStock = item.CurrentStock || item.current_stock || 0;
+        const reorderPoint = item.ReorderPoint || item.reorder_point || 0;
+        const unitCost = item.UnitCost || item.unit_cost || 0;
+        const totalValue = currentStock * unitCost;
+        
+        let status = 'in_stock';
+        if (currentStock === 0) {
+          status = 'out_of_stock';
+        } else if (currentStock <= reorderPoint) {
+          status = 'low_stock';
+        }
+
+        return {
+          id: item.ProductID || item.product_id || item.id,
+          productName: item.ProductName || item.product_name || item.name || 'Unknown',
+          productId: item.ProductID || item.product_id || item.id,
+          currentStock,
+          reorderPoint,
+          unitCost,
+          totalValue,
+          status,
+          lastRestocked: item.LastRestocked ? new Date(item.LastRestocked) : new Date()
+        };
+      });
+
+      setInventory(formattedInventory);
+      setLowStockItems(formattedInventory.filter(item => item.status === 'low_stock' || item.status === 'out_of_stock'));
+
+      // Calculate metrics
+      const totalItems = formattedInventory.length;
+      const inStock = formattedInventory.filter(item => item.status === 'in_stock').length;
+      const lowStock = formattedInventory.filter(item => item.status === 'low_stock').length;
+      const outOfStock = formattedInventory.filter(item => item.status === 'out_of_stock').length;
+      const totalValue = formattedInventory.reduce((sum, item) => sum + item.totalValue, 0);
+
+      setMetrics({
+        totalItems,
+        inStock,
+        lowStock,
+        outOfStock,
+        totalValue: Math.round(totalValue),
+      });
+
+    } catch (err) {
+      console.error('Error fetching inventory:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load inventory');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      setInventory(mockInventory);
-      setLowStockItems(mockInventory.filter(item => item.status === 'low_stock' || item.status === 'out_of_stock'));
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchInventoryData();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchInventoryData();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchInventoryData]);
 
   const getStatusVariant = (status) => {
     const variants = {
@@ -101,7 +129,7 @@ export const Inventory = () => {
     { name: 'In Stock', value: metrics.inStock, color: '#22c55e' },
     { name: 'Low Stock', value: metrics.lowStock, color: '#f59e0b' },
     { name: 'Out of Stock', value: metrics.outOfStock, color: '#ef4444' },
-  ];
+  ].filter(item => item.value > 0);
 
   if (loading) {
     return <LoadingSpinner text="Loading inventory..." />;
@@ -117,8 +145,8 @@ export const Inventory = () => {
             Monitor stock levels and manage inventory
           </p>
         </div>
-      <div className="flex items-center gap-3">
-          <Button variant="outline">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={fetchInventoryData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -128,6 +156,14 @@ export const Inventory = () => {
           </Button>
         </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Low Stock Alerts */}
       {lowStockItems.length > 0 && (
@@ -170,7 +206,7 @@ export const Inventory = () => {
         />
         <MetricCard
           title="Total Value"
-          value={`$${metrics.totalValue.toLocaleString()}`}
+          value={metrics.totalValue.toLocaleString()}
           icon={TrendingUp}
           variant="accent"
         />
@@ -272,8 +308,8 @@ export const Inventory = () => {
                     </div>
                   </TableCell>
                   <TableCell>{item.reorderPoint}</TableCell>
-                  <TableCell>${item.unitCost.toFixed(2)}</TableCell>
-                  <TableCell className="font-semibold">${item.totalValue.toLocaleString()}</TableCell>
+                  <TableCell>{item.unitCost.toFixed(2)}</TableCell>
+                  <TableCell className="font-semibold">{item.totalValue.toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusVariant(item.status)}>
                       {item.status.replace('_', ' ')}

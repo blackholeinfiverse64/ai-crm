@@ -309,7 +309,7 @@ export const Dashboard = () => {
             title="Sales & Orders Trend"
             data={salesData}
             lines={[
-              { dataKey: 'sales', name: 'Sales ($)', color: 'hsl(var(--primary))' },
+              { dataKey: 'sales', name: 'Sales', color: 'hsl(var(--primary))' },
               { dataKey: 'orders', name: 'Orders', color: 'hsl(var(--secondary))' },
             ]}
             height={300}

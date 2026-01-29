@@ -1,68 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, AlertTriangle, CheckCircle, Info, XCircle,
-  Settings, Filter, CheckCheck
+  Settings, Filter, CheckCheck, RefreshCw
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Badge from '../components/common/ui/Badge';
+import Alert from '../components/common/ui/Alert';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { formatRelativeTime } from '@/utils/dateUtils';
+import { dashboardAPI } from '../services/api/dashboardAPI';
 
 export const Notifications = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('all'); // all, unread, read
+  const [metrics, setMetrics] = useState({
+    total: 0,
+    unread: 0,
+    today: 0,
+    critical: 0,
+  });
 
-  const metrics = {
-    total: 124,
-    unread: 23,
-    today: 12,
-    critical: 3,
-  };
+  // Fetch alerts from backend
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockNotifications = [
-    {
-      id: 1,
-      type: 'warning',
-      title: 'Low Stock Alert',
-      message: 'Product PROD-003 is running low (5 units remaining)',
-      timestamp: new Date(Date.now() - 1800000),
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'success',
-      title: 'Order Delivered',
-      message: 'Order ORD-1002 has been successfully delivered',
-      timestamp: new Date(Date.now() - 3600000),
-      read: false,
-    },
-    {
-      id: 3,
-      type: 'info',
-      title: 'New Lead',
-      message: 'A new lead has been added to the CRM system',
-      timestamp: new Date(Date.now() - 7200000),
-      read: true,
-    },
-    {
-      id: 4,
-      type: 'error',
-      title: 'Shipment Delay',
-      message: 'Shipment SHIP-004 has been delayed due to weather conditions',
-      timestamp: new Date(Date.now() - 10800000),
-      read: false,
-    },
-  ];
+      const response = await dashboardAPI.getAlerts();
+      const alerts = response.data?.alerts || response.data || [];
+
+      // Transform alerts to notifications format
+      const formattedNotifications = alerts.map((alert, index) => ({
+        id: alert.id || index + 1,
+        type: alert.severity === 'critical' ? 'error' :
+              alert.severity === 'high' ? 'warning' :
+              alert.severity === 'medium' ? 'info' : 'success',
+        title: alert.title || alert.message || 'Alert',
+        message: alert.message || alert.description || '',
+        timestamp: alert.timestamp ? new Date(alert.timestamp) : new Date(),
+        read: alert.read || false,
+        severity: alert.severity || 'medium'
+      }));
+
+      setNotifications(formattedNotifications);
+
+      // Calculate metrics
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayAlerts = formattedNotifications.filter(n => n.timestamp >= today);
+      const unreadAlerts = formattedNotifications.filter(n => !n.read);
+      const criticalAlerts = formattedNotifications.filter(n => n.severity === 'critical');
+
+      setMetrics({
+        total: formattedNotifications.length,
+        unread: unreadAlerts.length,
+        today: todayAlerts.length,
+        critical: criticalAlerts.length,
+      });
+
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load notifications');
+      // Fallback to empty array
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      setNotifications(mockNotifications);
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchNotifications();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
 
   const getIcon = (type) => {
     const icons = {
@@ -104,7 +123,11 @@ export const Notifications = () => {
             View and manage system notifications and alerts
           </p>
         </div>
-      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={fetchNotifications}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button variant="outline">
             <Filter className="h-4 w-4 mr-2" />
             Filter
@@ -119,6 +142,14 @@ export const Notifications = () => {
           </Button>
         </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

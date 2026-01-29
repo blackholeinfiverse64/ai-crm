@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Mail, Send, Clock, CheckCircle, XCircle, AlertTriangle,
   Plus, RefreshCw, Settings, FileText, Calendar, ChevronRight,
@@ -9,6 +9,7 @@ import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Input from '../components/common/forms/Input';
 import Badge from '../components/common/ui/Badge';
+import { Alert } from '../components/common/ui/Alert';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { Modal, ModalFooter } from '../components/common/ui/Modal';
@@ -17,11 +18,18 @@ import { formatDate, formatRelativeTime } from '@/utils/dateUtils';
 
 export const Emails = () => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('send'); // send, scheduled, activity, settings
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('send');
   const [scheduledEmails, setScheduledEmails] = useState([]);
   const [emailActivity, setEmailActivity] = useState([]);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailType, setEmailType] = useState('restock');
+  const [metrics, setMetrics] = useState({
+    emailsSentToday: 0,
+    successRate: 0,
+    scheduled: 0,
+    templates: 0,
+  });
   
   // Settings state
   const [smtpSettings, setSmtpSettings] = useState({
@@ -32,46 +40,87 @@ export const Emails = () => {
   });
   const [expandedTriggers, setExpandedTriggers] = useState({});
 
-  const metrics = {
-    emailsSentToday: 47,
-    successRate: 95.2,
-    scheduled: 12,
-    templates: 8,
-  };
+  // Fetch email data
+  const fetchEmailData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockScheduledEmails = [
-    {
-      id: 1,
-      subject: 'Weekly Inventory Report',
-      recipients: ['inventory@company.com'],
-      scheduledTime: new Date(Date.now() + 86400000),
-      status: 'pending',
-      priority: 'medium',
-    },
-    {
-      id: 2,
-      subject: 'Monthly Supplier Review',
-      recipients: ['procurement@company.com', 'manager@company.com'],
-      scheduledTime: new Date(Date.now() + 259200000),
-      status: 'pending',
-      priority: 'high',
-    },
-  ];
+      // Fetch scheduled emails
+      try {
+        const scheduledResponse = await emsAPI.getScheduledEmails();
+        const scheduledData = scheduledResponse.data?.scheduled || scheduledResponse.data || [];
+        setScheduledEmails(scheduledData.map(email => ({
+          id: email.id,
+          subject: email.subject || email.title || 'Scheduled Email',
+          recipients: Array.isArray(email.recipients) ? email.recipients : [email.recipient || ''],
+          scheduledTime: email.scheduled_time ? new Date(email.scheduled_time) : new Date(),
+          status: email.status || 'pending',
+          priority: email.priority || 'medium',
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch scheduled emails:', err);
+      }
 
-  const mockActivity = [
-    { id: 1, type: 'Restock Alert', recipient: 'inventory@company.com', status: 'sent', timestamp: new Date(Date.now() - 3600000) },
-    { id: 2, type: 'Purchase Order', recipient: 'supplier@techparts.com', status: 'sent', timestamp: new Date(Date.now() - 7200000) },
-    { id: 3, type: 'Shipment Notification', recipient: 'customer@example.com', status: 'sent', timestamp: new Date(Date.now() - 10800000) },
-    { id: 4, type: 'Delivery Delay', recipient: 'customer2@example.com', status: 'failed', timestamp: new Date(Date.now() - 14400000) },
-  ];
+      // Fetch email activity
+      try {
+        const activityResponse = await emsAPI.getEmailActivity({ limit: 100 });
+        const activityData = activityResponse.data?.activity || activityResponse.data || [];
+        setEmailActivity(activityData.map(activity => ({
+          id: activity.id,
+          type: activity.type || activity.email_type || 'Email',
+          recipient: activity.recipient || activity.to || '',
+          status: activity.status || 'sent',
+          timestamp: activity.timestamp ? new Date(activity.timestamp) : new Date(),
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch email activity:', err);
+      }
+
+      // Fetch email stats
+      try {
+        const statsResponse = await emsAPI.getEmailStats();
+        const stats = statsResponse.data || {};
+        setMetrics({
+          emailsSentToday: stats.emails_sent_today || stats.today || 0,
+          successRate: stats.success_rate || 0,
+          scheduled: scheduledEmails.length || stats.scheduled || 0,
+          templates: stats.templates || 0,
+        });
+      } catch (err) {
+        console.warn('Failed to fetch email stats:', err);
+        // Calculate from activity data
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayEmails = emailActivity.filter(e => e.timestamp >= today);
+        const successful = emailActivity.filter(e => e.status === 'sent').length;
+        const successRate = emailActivity.length > 0 ? Math.round((successful / emailActivity.length) * 100 * 10) / 10 : 0;
+        setMetrics({
+          emailsSentToday: todayEmails.length,
+          successRate,
+          scheduled: scheduledEmails.length,
+          templates: 0,
+        });
+      }
+
+    } catch (err) {
+      console.error('Error fetching email data:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load email data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      setScheduledEmails(mockScheduledEmails);
-      setEmailActivity(mockActivity);
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchEmailData();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchEmailData();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchEmailData]);
 
   const getStatusVariant = (status) => {
     const variants = {
@@ -120,16 +169,30 @@ export const Emails = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-        <h1 className="text-3xl font-heading font-bold tracking-tight">Email Automation</h1>
+          <h1 className="text-3xl font-heading font-bold tracking-tight">Email Automation</h1>
           <p className="text-muted-foreground mt-1">
             Manage email triggers and automated notifications
           </p>
         </div>
-        <Button onClick={() => setShowEmailModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Send Email
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchEmailData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={() => setShowEmailModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Send Email
+          </Button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

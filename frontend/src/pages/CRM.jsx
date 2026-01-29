@@ -1,208 +1,195 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Users, TrendingUp, DollarSign, Target, Plus, Search, Filter, 
   Building2, Phone, Mail, Calendar, Activity, Award, 
   BarChart3, PieChart, Clock, CheckCircle2, AlertCircle,
-  UserCheck, FileText, TrendingDown, Briefcase, MapPin
+  UserCheck, FileText, TrendingDown, Briefcase, MapPin,
+  RefreshCw
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Input from '../components/common/forms/Input';
 import Badge from '../components/common/ui/Badge';
+import Alert from '../components/common/ui/Alert';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { formatDate, formatRelativeTime } from '@/utils/dateUtils';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { crmAPI } from '../services/api/crmAPI';
+import { dashboardAPI } from '../services/api/dashboardAPI';
 
 export const CRM = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [accounts, setAccounts] = useState([]);
-  const [activeTab, setActiveTab] = useState('overview'); // overview, accounts, leads, opportunities, activities
+  const [leads, setLeads] = useState([]);
+  const [opportunities, setOpportunities] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [activeTab, setActiveTab] = useState('overview');
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [metrics, setMetrics] = useState({
+    totalAccounts: 0,
+    activeLeads: 0,
+    opportunities: 0,
+    conversionRate: 0,
+    pipelineValue: 0,
+    avgDealSize: 0,
+    closedWon: 0,
+    closedLost: 0,
+  });
 
-  const metrics = {
-    totalAccounts: 532,
-    activeLeads: 148,
-    opportunities: 67,
-    conversionRate: 24.8,
-    pipelineValue: 1500000,
-    avgDealSize: 83500,
-    closedWon: 28,
-    closedLost: 12,
-  };
+  // Fetch all CRM data
+  const fetchCRMData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockAccounts = [
-    { 
-      id: 'ACC-001', 
-      name: 'TechCorp Industries', 
-      industry: 'Technology', 
-      value: 125000, 
-      revenue: 5000000,
-      stage: 'negotiation', 
-      contact: 'John Smith',
-      email: 'john.smith@techcorp.com',
-      phone: '+1-555-0101',
-      territory: 'West Coast',
-      accountType: 'customer',
-      manager: 'Sarah Johnson',
-      lastActivity: new Date(Date.now() - 86400000) 
-    },
-    { 
-      id: 'ACC-002', 
-      name: 'Global Manufacturing Ltd', 
-      industry: 'Manufacturing', 
-      value: 89000,
-      revenue: 15000000, 
-      stage: 'proposal', 
-      contact: 'Robert Johnson',
-      email: 'robert.johnson@globalmanuf.com',
-      phone: '+1-555-0102',
-      territory: 'Midwest',
-      accountType: 'distributor',
-      manager: 'Mike Chen',
-      lastActivity: new Date(Date.now() - 172800000) 
-    },
-    { 
-      id: 'ACC-003', 
-      name: 'Retail Solutions Inc', 
-      industry: 'Retail', 
-      value: 210000,
-      revenue: 8000000, 
-      stage: 'closed_won', 
-      contact: 'Jane Doe',
-      email: 'jane.doe@retailsolutions.com',
-      phone: '+1-555-0103',
-      territory: 'East Coast',
-      accountType: 'customer',
-      manager: 'Lisa Wang',
-      lastActivity: new Date(Date.now() - 259200000) 
-    },
-  ];
+      // Fetch dashboard data for overview metrics
+      if (activeTab === 'overview') {
+        try {
+          const dashboardResponse = await dashboardAPI.getAccounts({ limit: 1 });
+          const dashboardData = dashboardResponse.data;
+          
+          // Calculate metrics from dashboard data
+          const totalAccounts = dashboardData?.total || dashboardData?.accounts?.length || 0;
+          
+          // Fetch leads for metrics
+          let leadsData = [];
+          try {
+            const leadsResponse = await crmAPI.getLeads({ limit: 100 });
+            leadsData = leadsResponse.data?.leads || leadsResponse.data || [];
+          } catch (err) {
+            console.warn('Failed to fetch leads:', err);
+          }
 
-  const mockLeads = [
-    {
-      id: 'LEAD-001',
-      name: 'David Brown',
-      company: 'StartupTech Co',
-      email: 'david@startuptech.co',
-      phone: '+1-555-1001',
-      status: 'new',
-      source: 'website',
-      budget: 100000,
-      territory: 'West Coast',
-      assignedTo: 'Sarah Johnson',
-      created: new Date(Date.now() - 432000000)
-    },
-    {
-      id: 'LEAD-002',
-      name: 'Emma Garcia',
-      company: 'MidSize Corp',
-      email: 'emma@midsize.com',
-      phone: '+1-555-1002',
-      status: 'contacted',
-      source: 'trade_show',
-      budget: 250000,
-      territory: 'Midwest',
-      assignedTo: 'Mike Chen',
-      created: new Date(Date.now() - 1036800000)
-    },
-    {
-      id: 'LEAD-003',
-      name: 'Robert Taylor',
-      company: 'Enterprise Solutions',
-      email: 'robert@enterprise.com',
-      phone: '+1-555-1003',
-      status: 'qualified',
-      source: 'referral',
-      budget: 500000,
-      territory: 'East Coast',
-      assignedTo: 'Lisa Wang',
-      created: new Date(Date.now() - 1728000000)
-    },
-  ];
+          // Fetch opportunities for metrics
+          let oppsData = [];
+          try {
+            const oppsResponse = await crmAPI.getOpportunities({ limit: 100 });
+            oppsData = oppsResponse.data?.opportunities || oppsResponse.data || [];
+          } catch (err) {
+            console.warn('Failed to fetch opportunities:', err);
+          }
 
-  const mockOpportunities = [
-    {
-      id: 'OPP-001',
-      name: 'TechCorp Logistics Upgrade',
-      accountId: 'ACC-001',
-      accountName: 'TechCorp Industries',
-      stage: 'proposal',
-      probability: 75,
-      amount: 300000,
-      closeDate: new Date(Date.now() + 3888000000),
-      owner: 'Sarah Johnson',
-      products: 'Logistics Platform, Analytics Dashboard',
-    },
-    {
-      id: 'OPP-002',
-      name: 'Global Manufacturing Partnership',
-      accountId: 'ACC-002',
-      accountName: 'Global Manufacturing Ltd',
-      stage: 'negotiation',
-      probability: 60,
-      amount: 750000,
-      closeDate: new Date(Date.now() + 5184000000),
-      owner: 'Mike Chen',
-      products: 'Full Platform Suite, Integration Services',
-    },
-    {
-      id: 'OPP-003',
-      name: 'Retail Chain Expansion',
-      accountId: 'ACC-003',
-      accountName: 'Retail Solutions Inc',
-      stage: 'prospecting',
-      probability: 25,
-      amount: 450000,
-      closeDate: new Date(Date.now() + 7776000000),
-      owner: 'Lisa Wang',
-      products: 'Inventory Management, Order Processing',
-    },
-  ];
+          // Calculate metrics
+          const activeLeads = leadsData.filter(l => l.lead_status !== 'converted').length;
+          const totalOpps = oppsData.length;
+          const closedWon = oppsData.filter(o => o.stage === 'closed_won' || o.opportunity_stage === 'closed_won').length;
+          const closedLost = oppsData.filter(o => o.stage === 'closed_lost' || o.opportunity_stage === 'closed_lost').length;
+          const pipelineValue = oppsData.reduce((sum, o) => sum + (parseFloat(o.amount || o.opportunity_amount || 0)), 0);
+          const avgDealSize = totalOpps > 0 ? pipelineValue / totalOpps : 0;
+          const conversionRate = leadsData.length > 0 ? (closedWon / leadsData.length) * 100 : 0;
 
-  const mockActivities = [
-    {
-      id: 'ACT-001',
-      subject: 'Initial discovery call',
-      type: 'call',
-      status: 'completed',
-      accountId: 'ACC-001',
-      accountName: 'TechCorp Industries',
-      dueDate: new Date(Date.now() - 172800000),
-      assignedTo: 'Sarah Johnson',
-      outcome: 'Identified key requirements for logistics upgrade',
-    },
-    {
-      id: 'ACT-002',
-      subject: 'Product demonstration',
-      type: 'meeting',
-      status: 'planned',
-      accountId: 'ACC-002',
-      accountName: 'Global Manufacturing Ltd',
-      dueDate: new Date(Date.now() + 259200000),
-      assignedTo: 'Mike Chen',
-      outcome: null,
-    },
-    {
-      id: 'ACT-003',
-      subject: 'Proposal presentation',
-      type: 'meeting',
-      status: 'in_progress',
-      accountId: 'ACC-003',
-      accountName: 'Retail Solutions Inc',
-      dueDate: new Date(Date.now() + 86400000),
-      assignedTo: 'Lisa Wang',
-      outcome: null,
-    },
-  ];
+          setMetrics({
+            totalAccounts,
+            activeLeads,
+            opportunities: totalOpps,
+            conversionRate: Math.round(conversionRate * 10) / 10,
+            pipelineValue: Math.round(pipelineValue),
+            avgDealSize: Math.round(avgDealSize),
+            closedWon,
+            closedLost,
+          });
+        } catch (err) {
+          console.warn('Failed to fetch dashboard data:', err);
+        }
+      }
+
+      // Fetch accounts
+      try {
+        const accountsResponse = await crmAPI.getAccounts({ limit: 100 });
+        const accountsData = accountsResponse.data?.accounts || accountsResponse.data || [];
+        setAccounts(accountsData.map(acc => ({
+          id: acc.account_id || acc.id,
+          name: acc.name || acc.account_name,
+          industry: acc.industry,
+          value: acc.annual_revenue || 0,
+          revenue: acc.annual_revenue || 0,
+          stage: acc.lifecycle_stage || 'prospect',
+          contact: acc.primary_contact || '',
+          email: acc.email,
+          phone: acc.phone,
+          territory: acc.territory || '',
+          accountType: acc.account_type || 'customer',
+          manager: acc.account_manager_id || '',
+          lastActivity: acc.updated_at ? new Date(acc.updated_at) : new Date()
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch accounts:', err);
+      }
+
+      // Fetch leads
+      try {
+        const leadsResponse = await crmAPI.getLeads({ limit: 100 });
+        const leadsData = leadsResponse.data?.leads || leadsResponse.data || [];
+        setLeads(leadsData.map(lead => ({
+          id: lead.lead_id || lead.id,
+          name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.company_name,
+          company: lead.company_name || lead.company,
+          email: lead.email,
+          phone: lead.phone,
+          status: lead.lead_status || lead.status || 'new',
+          source: lead.lead_source || lead.source || 'website',
+          budget: parseFloat(lead.budget || lead.estimated_value || 0),
+          territory: lead.territory || '',
+          assignedTo: lead.assigned_to || lead.owner || '',
+          created: lead.created_at ? new Date(lead.created_at) : new Date()
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch leads:', err);
+      }
+
+      // Fetch opportunities
+      try {
+        const oppsResponse = await crmAPI.getOpportunities({ limit: 100 });
+        const oppsData = oppsResponse.data?.opportunities || oppsResponse.data || [];
+        setOpportunities(oppsData.map(opp => ({
+          id: opp.opportunity_id || opp.id,
+          name: opp.opportunity_name || opp.name,
+          accountId: opp.account_id,
+          accountName: opp.account_name || '',
+          stage: opp.opportunity_stage || opp.stage || 'prospecting',
+          probability: parseFloat(opp.probability || opp.close_probability || 0),
+          amount: parseFloat(opp.opportunity_amount || opp.amount || 0),
+          closeDate: opp.close_date ? new Date(opp.close_date) : new Date(),
+          owner: opp.owner || opp.assigned_to || '',
+          products: opp.products || ''
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch opportunities:', err);
+      }
+
+      // Fetch activities
+      try {
+        const activitiesResponse = await crmAPI.getActivities({ limit: 100 });
+        const activitiesData = activitiesResponse.data?.activities || activitiesResponse.data || [];
+        setActivities(activitiesData.map(act => ({
+          id: act.activity_id || act.id,
+          subject: act.subject || act.activity_subject || '',
+          type: act.activity_type || act.type || 'call',
+          status: act.activity_status || act.status || 'planned',
+          accountId: act.account_id,
+          accountName: act.account_name || '',
+          dueDate: act.due_date ? new Date(act.due_date) : new Date(),
+          assignedTo: act.assigned_to || act.owner || '',
+          outcome: act.outcome || act.result || null
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch activities:', err);
+      }
+
+    } catch (err) {
+      console.error('Error fetching CRM data:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load CRM data');
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
-    setTimeout(() => {
-      setAccounts(mockAccounts);
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchCRMData();
+  }, [fetchCRMData]);
 
   const getStageVariant = (stage) => {
     const variants = {
@@ -236,28 +223,33 @@ export const CRM = () => {
     return variants[status] || 'default';
   };
 
-  // Chart data
-  const opportunityStageData = [
-    { name: 'Prospecting', value: 3 },
-    { name: 'Proposal', value: 8 },
-    { name: 'Negotiation', value: 12 },
-    { name: 'Closed Won', value: 28 },
-  ];
+  // Chart data (computed from real data)
+  const opportunityStageData = (() => {
+    const stageCounts = {};
+    opportunities.forEach(opp => {
+      const stage = opp.stage || 'unknown';
+      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+    });
+    return Object.entries(stageCounts).map(([name, value]) => ({ name, value })).filter(item => item.value > 0);
+  })();
 
-  const leadSourceData = [
-    { name: 'Website', count: 42 },
-    { name: 'Trade Show', count: 35 },
-    { name: 'Referral', count: 28 },
-    { name: 'Email Campaign', count: 22 },
-    { name: 'Cold Call', count: 15 },
-  ];
+  const leadSourceData = (() => {
+    const sourceCounts = {};
+    leads.forEach(lead => {
+      const source = lead.source || 'unknown';
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    });
+    return Object.entries(sourceCounts).map(([name, count]) => ({ name: name.replace('_', ' '), count })).filter(item => item.count > 0);
+  })();
 
-  const revenueByTerritory = [
-    { territory: 'West Coast', revenue: 5200000 },
-    { territory: 'Midwest', revenue: 4800000 },
-    { territory: 'East Coast', revenue: 6100000 },
-    { territory: 'South', revenue: 3900000 },
-  ];
+  const revenueByTerritory = (() => {
+    const territoryRevenue = {};
+    accounts.forEach(acc => {
+      const territory = acc.territory || 'Unknown';
+      territoryRevenue[territory] = (territoryRevenue[territory] || 0) + (acc.revenue || 0);
+    });
+    return Object.entries(territoryRevenue).map(([territory, revenue]) => ({ territory, revenue })).filter(item => item.revenue > 0);
+  })();
 
   const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -304,7 +296,7 @@ export const CRM = () => {
         />
         <MetricCard
           title="Pipeline Value"
-          value={`$${(metrics.pipelineValue / 1000000).toFixed(1)}M`}
+          value={`${(metrics.pipelineValue / 1000000).toFixed(1)}M`}
           trend="up"
           trendValue="+15%"
           icon={DollarSign}
@@ -312,7 +304,7 @@ export const CRM = () => {
         />
         <MetricCard
           title="Avg Deal Size"
-          value={`$${(metrics.avgDealSize / 1000).toFixed(0)}K`}
+          value={`${(metrics.avgDealSize / 1000).toFixed(0)}K`}
           trend="up"
           trendValue="+8%"
           icon={Award}
@@ -391,7 +383,7 @@ export const CRM = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="territory" />
                   <YAxis />
-                  <Tooltip formatter={(value) => `$${(value / 1000000).toFixed(1)}M`} />
+                  <Tooltip formatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
                   <Bar dataKey="revenue" fill="#10b981" />
                 </BarChart>
               </ResponsiveContainer>
@@ -408,7 +400,7 @@ export const CRM = () => {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">$20.0M</p>
+                <p className="text-2xl font-bold">20.0M</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Top Territory</p>
@@ -433,7 +425,7 @@ export const CRM = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {mockActivities.map((activity) => (
+            {activities.slice(0, 5).map((activity) => (
               <div
                 key={activity.id}
                 className="flex items-start gap-4 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
@@ -507,7 +499,7 @@ export const CRM = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockAccounts.map((account) => (
+            {accounts.map((account) => (
               <TableRow key={account.id}>
                 <TableCell className="font-medium">{account.id}</TableCell>
                 <TableCell className="font-semibold">{account.name}</TableCell>
@@ -516,7 +508,7 @@ export const CRM = () => {
                   <Badge variant="outline">{account.accountType}</Badge>
                 </TableCell>
                 <TableCell>{account.territory}</TableCell>
-                <TableCell>${(account.revenue / 1000000).toFixed(1)}M</TableCell>
+                <TableCell>{(account.revenue / 1000000).toFixed(1)}M</TableCell>
                 <TableCell>{account.manager}</TableCell>
                 <TableCell>{formatRelativeTime(account.lastActivity)}</TableCell>
                 <TableCell>
@@ -560,7 +552,7 @@ export const CRM = () => {
         />
         <MetricCard
           title="Total Budget"
-          value="$850K"
+          value="850K"
           icon={DollarSign}
           variant="primary"
         />
@@ -591,7 +583,7 @@ export const CRM = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockLeads.map((lead) => (
+              {leads.map((lead) => (
                 <TableRow key={lead.id}>
                   <TableCell className="font-medium">{lead.id}</TableCell>
                   <TableCell className="font-semibold">{lead.name}</TableCell>
@@ -604,7 +596,7 @@ export const CRM = () => {
                   <TableCell>
                     <Badge variant="outline">{lead.source.replace('_', ' ')}</Badge>
                   </TableCell>
-                  <TableCell>${(lead.budget / 1000).toFixed(0)}K</TableCell>
+                  <TableCell>{(lead.budget / 1000).toFixed(0)}K</TableCell>
                   <TableCell>{lead.territory}</TableCell>
                   <TableCell>{lead.assignedTo}</TableCell>
                   <TableCell>{formatRelativeTime(lead.created)}</TableCell>
@@ -634,7 +626,7 @@ export const CRM = () => {
         />
         <MetricCard
           title="Pipeline Value"
-          value={`$${(metrics.pipelineValue / 1000000).toFixed(1)}M`}
+          value={`${(metrics.pipelineValue / 1000000).toFixed(1)}M`}
           icon={DollarSign}
           variant="accent"
         />
@@ -676,7 +668,7 @@ export const CRM = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockOpportunities.map((opp) => (
+              {opportunities.map((opp) => (
                 <TableRow key={opp.id}>
                   <TableCell className="font-medium">{opp.id}</TableCell>
                   <TableCell className="font-semibold">{opp.name}</TableCell>
@@ -697,7 +689,7 @@ export const CRM = () => {
                       <span className="text-sm">{opp.probability}%</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-semibold">${(opp.amount / 1000).toFixed(0)}K</TableCell>
+                  <TableCell className="font-semibold">{(opp.amount / 1000).toFixed(0)}K</TableCell>
                   <TableCell>{formatDate(opp.closeDate)}</TableCell>
                   <TableCell>{opp.owner}</TableCell>
                   <TableCell>
@@ -768,7 +760,7 @@ export const CRM = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockActivities.map((activity) => (
+              {activities.map((activity) => (
                 <TableRow key={activity.id}>
                   <TableCell className="font-medium">{activity.id}</TableCell>
                   <TableCell className="font-semibold">{activity.subject}</TableCell>
@@ -810,11 +802,25 @@ export const CRM = () => {
             Comprehensive customer relationship management system
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          New Account
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchCRMData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            New Account
+          </Button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertCircle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex items-center gap-2 border-b border-border">

@@ -560,7 +560,7 @@ export const Products = () => {
                     <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
                     <p className="text-sm text-muted-foreground mb-2">{product.product_id}</p>
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl font-bold">${product.unit_price || product.price}</span>
+                      <span className="text-2xl font-bold">{product.unit_price || product.price}</span>
                       <span className="text-sm text-muted-foreground">Stock: {product.stock || 0}</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -630,7 +630,7 @@ export const Products = () => {
                           </div>
                         </TableCell>
                         <TableCell>{product.category}</TableCell>
-                        <TableCell className="font-semibold">${product.unit_price || product.price}</TableCell>
+                        <TableCell className="font-semibold">{product.unit_price || product.price}</TableCell>
                         <TableCell>{product.stock || 0}</TableCell>
                         <TableCell>{product.supplier_id || 'N/A'}</TableCell>
                         <TableCell>
@@ -746,7 +746,7 @@ export const Products = () => {
                         </div>
                       </TableCell>
                       <TableCell>{product.category}</TableCell>
-                      <TableCell className="font-semibold">${product.unit_price || product.price}</TableCell>
+                      <TableCell className="font-semibold">{product.unit_price || product.price}</TableCell>
                       <TableCell>{product.stock || 0}</TableCell>
                       <TableCell>{product.supplier_id || 'N/A'}</TableCell>
                       <TableCell>

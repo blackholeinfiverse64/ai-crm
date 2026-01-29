@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   GraduationCap, TrendingUp, TrendingDown, Award, 
-  Play, Save, RefreshCw, BarChart3, Target, Zap
+  Play, Save, RefreshCw, BarChart3, Target, Zap, AlertCircle
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Input from '../components/common/forms/Input';
 import Badge from '../components/common/ui/Badge';
+import { Alert } from '../components/common/ui/Alert';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { Modal, ModalFooter } from '../components/common/ui/Modal';
@@ -16,42 +17,91 @@ import { rlAPI } from '../services/api/rlAPI';
 
 export const Learning = () => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('analytics'); // analytics, performance, control, insights
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('analytics');
   const [agentRankings, setAgentRankings] = useState([]);
+  const [rewardHistory, setRewardHistory] = useState([]);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
+  const [metrics, setMetrics] = useState({
+    totalActions: 0,
+    averageReward: 0,
+    learningStatus: 'stable',
+    progressRate: 0,
+  });
 
-  const metrics = {
-    totalActions: 1523,
-    averageReward: 42.5,
-    learningStatus: 'improving',
-    progressRate: 68.5,
-  };
+  // Fetch RL data
+  const fetchRLData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockRankings = [
-    { rank: 1, agentName: 'Restock Agent', avgReward: 58.2, totalActions: 456, trend: 12.5 },
-    { rank: 2, agentName: 'Delivery Agent', avgReward: 52.8, totalActions: 389, trend: 8.3 },
-    { rank: 3, agentName: 'Procurement Agent', avgReward: 48.5, totalActions: 312, trend: 5.7 },
-    { rank: 4, agentName: 'Inventory Optimizer', avgReward: 35.2, totalActions: 198, trend: -2.1 },
-  ];
+      // Fetch agent rankings
+      try {
+        const rankingsResponse = await rlAPI.getAgentRankings();
+        const rankingsData = rankingsResponse.data?.rankings || rankingsResponse.data || [];
+        setAgentRankings(rankingsData.map((agent, index) => ({
+          rank: index + 1,
+          agentName: agent.agent_name || agent.name || 'Unknown Agent',
+          avgReward: parseFloat(agent.avg_reward || agent.average_reward || 0),
+          totalActions: agent.total_actions || 0,
+          trend: parseFloat(agent.trend || 0),
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch agent rankings:', err);
+      }
 
-  const rewardHistory = [
-    { action: 1, reward: 45.2 },
-    { action: 2, reward: 48.5 },
-    { action: 3, reward: 52.1 },
-    { action: 4, reward: 49.8 },
-    { action: 5, reward: 55.3 },
-    { action: 6, reward: 58.7 },
-    { action: 7, reward: 56.2 },
-    { action: 8, reward: 60.1 },
-  ];
+      // Fetch analytics
+      try {
+        const analyticsResponse = await rlAPI.getAnalytics();
+        const analytics = analyticsResponse.data || {};
+        setMetrics({
+          totalActions: analytics.total_actions || 0,
+          averageReward: parseFloat(analytics.average_reward || analytics.avg_reward || 0),
+          learningStatus: analytics.learning_status || analytics.status || 'stable',
+          progressRate: parseFloat(analytics.progress_rate || 0),
+        });
+
+        // Set reward history from analytics
+        if (analytics.reward_history) {
+          setRewardHistory(analytics.reward_history.map((item, index) => ({
+            action: index + 1,
+            reward: parseFloat(item.reward || item),
+          })));
+        }
+      } catch (err) {
+        console.warn('Failed to fetch analytics:', err);
+        // Calculate from rankings
+        if (agentRankings.length > 0) {
+          const totalActions = agentRankings.reduce((sum, a) => sum + a.totalActions, 0);
+          const avgReward = agentRankings.reduce((sum, a) => sum + a.avgReward, 0) / agentRankings.length;
+          setMetrics({
+            totalActions,
+            averageReward: Math.round(avgReward * 10) / 10,
+            learningStatus: 'stable',
+            progressRate: 0,
+          });
+        }
+      }
+
+    } catch (err) {
+      console.error('Error fetching RL data:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load RL data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      setAgentRankings(mockRankings);
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchRLData();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchRLData();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchRLData]);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -66,21 +116,51 @@ export const Learning = () => {
     return <LoadingSpinner text="Loading RL learning system..." />;
   }
 
+  const handleRunRLWorkflow = async () => {
+    try {
+      setLoading(true);
+      await rlAPI.runRLWorkflow({});
+      // Refresh data after workflow execution
+      setTimeout(() => {
+        fetchRLData();
+      }, 2000);
+    } catch (error) {
+      console.error('Error running RL workflow:', error);
+      setError(error.response?.data?.detail || error.message || 'Failed to run RL workflow');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-        <h1 className="text-3xl font-heading font-bold tracking-tight">RL Learning System</h1>
+          <h1 className="text-3xl font-heading font-bold tracking-tight">RL Learning System</h1>
           <p className="text-muted-foreground mt-1">
             Reinforcement Learning with reward/penalty loops for AI agent optimization
           </p>
         </div>
-        <Button>
-          <Play className="h-4 w-4 mr-2" />
-          Run RL Workflow
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchRLData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={handleRunRLWorkflow}>
+            <Play className="h-4 w-4 mr-2" />
+            Run RL Workflow
+          </Button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertCircle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

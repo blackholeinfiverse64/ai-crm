@@ -1,92 +1,131 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Bot, Play, Pause, RefreshCw, Settings, Activity, 
-  TrendingUp, Zap, CheckCircle, AlertCircle, Clock
+  TrendingUp, Zap, CheckCircle, AlertCircle, Clock, AlertTriangle
 } from 'lucide-react';
 import Card, { CardHeader, CardTitle, CardContent } from '../components/common/ui/Card';
 import MetricCard from '../components/common/charts/MetricCard';
 import Button from '../components/common/ui/Button';
 import Badge from '../components/common/ui/Badge';
+import { Alert } from '../components/common/ui/Alert';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/ui/Table';
 import { LoadingSpinner } from '../components/common/ui/Spinner';
 import { agentAPI } from '../services/api/agentAPI';
+import { logisticsAPI } from '../services/api/logisticsAPI';
 import { formatRelativeTime } from '@/utils/dateUtils';
 
 export const Agents = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [agents, setAgents] = useState([]);
   const [agentLogs, setAgentLogs] = useState([]);
+  const [metrics, setMetrics] = useState({
+    totalAgents: 0,
+    activeAgents: 0,
+    pausedAgents: 0,
+    totalActions: 0,
+    successRate: 0,
+  });
 
-  const metrics = {
-    totalAgents: 12,
-    activeAgents: 8,
-    pausedAgents: 2,
-    totalActions: 1523,
-    successRate: 94.5,
-  };
+  // Fetch agent data
+  const fetchAgentData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const mockAgents = [
-    {
-      id: 'AGENT-001',
-      name: 'Restock Agent',
-      type: 'restock',
-      status: 'active',
-      description: 'Monitors inventory and creates restock requests',
-      lastRun: new Date(Date.now() - 3600000),
-      actionsToday: 45,
-      successRate: 96.2,
-      avgExecutionTime: '2.3s',
-    },
-    {
-      id: 'AGENT-002',
-      name: 'Procurement Agent',
-      type: 'procurement',
-      status: 'active',
-      description: 'Handles purchase orders and supplier communication',
-      lastRun: new Date(Date.now() - 7200000),
-      actionsToday: 32,
-      successRate: 92.8,
-      avgExecutionTime: '5.1s',
-    },
-    {
-      id: 'AGENT-003',
-      name: 'Delivery Agent',
-      type: 'delivery',
-      status: 'active',
-      description: 'Manages shipments and delivery tracking',
-      lastRun: new Date(Date.now() - 1800000),
-      actionsToday: 67,
-      successRate: 98.1,
-      avgExecutionTime: '1.8s',
-    },
-    {
-      id: 'AGENT-004',
-      name: 'Inventory Optimizer',
-      type: 'optimization',
-      status: 'paused',
-      description: 'Optimizes inventory levels using AI',
-      lastRun: new Date(Date.now() - 86400000),
-      actionsToday: 0,
-      successRate: 89.5,
-      avgExecutionTime: '12.5s',
-    },
-  ];
+      // Fetch agents
+      try {
+        const agentsResponse = await agentAPI.getAgents();
+        const agentsData = agentsResponse.data?.agents || agentsResponse.data || [];
+        setAgents(agentsData.map(agent => ({
+          id: agent.id || agent.agent_id,
+          name: agent.name || agent.agent_name || 'Unknown Agent',
+          type: agent.type || agent.agent_type || 'general',
+          status: agent.status || 'active',
+          description: agent.description || agent.purpose || 'No description',
+          lastRun: agent.last_run ? new Date(agent.last_run) : new Date(),
+          actionsToday: agent.actions_today || agent.actions_count || 0,
+          successRate: parseFloat(agent.success_rate || 0),
+          avgExecutionTime: agent.avg_execution_time || '0s',
+        })));
 
-  const mockLogs = [
-    { id: 1, agent: 'Restock Agent', action: 'Created restock request', status: 'success', timestamp: new Date(Date.now() - 300000) },
-    { id: 2, agent: 'Procurement Agent', action: 'Sent purchase order', status: 'success', timestamp: new Date(Date.now() - 600000) },
-    { id: 3, agent: 'Delivery Agent', action: 'Updated shipment status', status: 'success', timestamp: new Date(Date.now() - 900000) },
-    { id: 4, agent: 'Restock Agent', action: 'Low stock alert triggered', status: 'warning', timestamp: new Date(Date.now() - 1200000) },
-    { id: 5, agent: 'Procurement Agent', action: 'Supplier response received', status: 'success', timestamp: new Date(Date.now() - 1800000) },
-  ];
+        // Calculate metrics
+        const totalAgents = agentsData.length;
+        const activeAgents = agentsData.filter(a => (a.status || 'active') === 'active').length;
+        const pausedAgents = agentsData.filter(a => (a.status || 'active') === 'paused').length;
+        const totalActions = agentsData.reduce((sum, a) => sum + (a.actions_today || 0), 0);
+        const avgSuccessRate = agentsData.length > 0 
+          ? agentsData.reduce((sum, a) => sum + parseFloat(a.success_rate || 0), 0) / agentsData.length 
+          : 0;
+
+        setMetrics({
+          totalAgents,
+          activeAgents,
+          pausedAgents,
+          totalActions,
+          successRate: Math.round(avgSuccessRate * 10) / 10,
+        });
+      } catch (err) {
+        console.warn('Failed to fetch agents:', err);
+        // Try alternative endpoint
+        try {
+          const statusResponse = await fetch('/api/agent/status');
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            // Transform status data to agents format
+          }
+        } catch (e) {
+          console.warn('Alternative endpoint also failed:', e);
+        }
+      }
+
+      // Fetch agent logs
+      try {
+        const logsResponse = await logisticsAPI.getAgentLogs({ limit: 100 });
+        const logsData = logsResponse.data?.logs || logsResponse.data || [];
+        setAgentLogs(logsData.map(log => ({
+          id: log.id || log.log_id,
+          agent: log.agent || log.agent_name || 'Unknown',
+          action: log.action || log.message || 'Action performed',
+          status: log.status || 'success',
+          timestamp: log.timestamp ? new Date(log.timestamp) : new Date(),
+        })));
+      } catch (err) {
+        console.warn('Failed to fetch agent logs:', err);
+        // Try agentAPI logs endpoint
+        try {
+          const agentLogsResponse = await agentAPI.getAgentLogs({ limit: 100 });
+          const agentLogsData = agentLogsResponse.data?.logs || agentLogsResponse.data || [];
+          setAgentLogs(agentLogsData.map(log => ({
+            id: log.id || log.log_id,
+            agent: log.agent || log.agent_name || 'Unknown',
+            action: log.action || log.message || 'Action performed',
+            status: log.status || 'success',
+            timestamp: log.timestamp ? new Date(log.timestamp) : new Date(),
+          })));
+        } catch (e) {
+          console.warn('Agent logs endpoint also failed:', e);
+        }
+      }
+
+    } catch (err) {
+      console.error('Error fetching agent data:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load agent data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      setAgents(mockAgents);
-      setAgentLogs(mockLogs);
-      setLoading(false);
-    }, 800);
-  }, []);
+    fetchAgentData();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchAgentData();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchAgentData]);
 
   const getStatusVariant = (status) => {
     const variants = {
@@ -97,19 +136,52 @@ export const Agents = () => {
     return variants[status] || 'default';
   };
 
-  const handleRunAgent = (agentId) => {
-    console.log('Running agent:', agentId);
-    // TODO: Call agentAPI.triggerAgent(agentId)
+  const handleRunAgent = async (agentId) => {
+    try {
+      setLoading(true);
+      await agentAPI.triggerAgent(agentId, {});
+      // Refresh data after triggering
+      setTimeout(() => {
+        fetchAgentData();
+      }, 2000);
+    } catch (error) {
+      console.error('Error running agent:', error);
+      setError(error.response?.data?.detail || error.message || 'Failed to run agent');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handlePauseAgent = (agentId) => {
-    console.log('Pausing agent:', agentId);
-    // TODO: Call agentAPI.pauseAgent(agentId)
+  const handlePauseAgent = async (agentId) => {
+    try {
+      setLoading(true);
+      await agentAPI.pauseAgent(agentId);
+      // Refresh data after pausing
+      setTimeout(() => {
+        fetchAgentData();
+      }, 1000);
+    } catch (error) {
+      console.error('Error pausing agent:', error);
+      setError(error.response?.data?.detail || error.message || 'Failed to pause agent');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleResumeAgent = (agentId) => {
-    console.log('Resuming agent:', agentId);
-    // TODO: Call agentAPI.resumeAgent(agentId)
+  const handleResumeAgent = async (agentId) => {
+    try {
+      setLoading(true);
+      await agentAPI.resumeAgent(agentId);
+      // Refresh data after resuming
+      setTimeout(() => {
+        fetchAgentData();
+      }, 1000);
+    } catch (error) {
+      console.error('Error resuming agent:', error);
+      setError(error.response?.data?.detail || error.message || 'Failed to resume agent');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -126,11 +198,25 @@ export const Agents = () => {
             Manage and monitor your AI agents
           </p>
         </div>
-        <Button>
-          <Settings className="h-4 w-4 mr-2" />
-          Agent Settings
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchAgentData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button>
+            <Settings className="h-4 w-4 mr-2" />
+            Agent Settings
+          </Button>
+        </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" onClose={() => setError(null)}>
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          {error}
+        </Alert>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
