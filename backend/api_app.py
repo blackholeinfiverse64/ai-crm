@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from database.service import DatabaseService
-from database.models import init_database
+from database.models import init_database, SessionLocal, Product, Inventory
 from database.crm_service import CRMService
 from database.models import create_tables as create_crm_tables
 from integrations.llm_query_system import LLMQuerySystem
@@ -185,11 +185,21 @@ app = FastAPI(
 INFIVERSE_BASE_URL = os.getenv("INFIVERSE_BASE_URL", "http://localhost:5000")
 
 # Add CORS middleware with security considerations
+# Allow frontend origins (Vite default ports + configured port)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8501", "http://localhost:8503", "https://yourdomain.com"],
+    allow_origins=[
+        "http://localhost:3000",  # Frontend configured port
+        "http://localhost:5173",  # Vite default port
+        "http://localhost:5174",  # Alternative Vite port
+        "http://localhost:8501",  # Streamlit dashboard
+        "http://localhost:8503",  # Streamlit dashboard
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -1756,6 +1766,360 @@ async def proxy_infiverse_departments(request: Request, current_user: User = Dep
         raise HTTPException(status_code=500, detail=f"Infiverse service error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# === PRODUCT MODELS ===
+
+class ProductCreate(BaseModel):
+    product_id: str
+    name: str
+    category: str
+    description: Optional[str] = None
+    unit_price: float
+    weight_kg: Optional[float] = 0.0
+    dimensions: Optional[str] = None
+    supplier_id: str
+    reorder_point: Optional[int] = 10
+    max_stock: Optional[int] = 100
+    is_active: Optional[bool] = True
+    marketing_description: Optional[str] = None
+    key_features: Optional[str] = None  # JSON string
+    specifications: Optional[str] = None  # JSON string
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    unit_price: Optional[float] = None
+    weight_kg: Optional[float] = None
+    dimensions: Optional[str] = None
+    supplier_id: Optional[str] = None
+    reorder_point: Optional[int] = None
+    max_stock: Optional[int] = None
+    is_active: Optional[bool] = None
+    marketing_description: Optional[str] = None
+    key_features: Optional[str] = None
+    specifications: Optional[str] = None
+
+# === PRODUCT CRUD ENDPOINTS ===
+
+@app.get("/products")
+async def get_products(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    category: Optional[str] = None,
+    supplier_id: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    search: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all products with filtering and pagination"""
+    try:
+        db = SessionLocal()
+        try:
+            query = db.query(Product)
+            
+            # Apply filters
+            if category:
+                query = query.filter(Product.category == category)
+            if supplier_id:
+                query = query.filter(Product.supplier_id == supplier_id)
+            if is_active is not None:
+                query = query.filter(Product.is_active == is_active)
+            if search:
+                search_term = f"%{search}%"
+                query = query.filter(
+                    (Product.name.ilike(search_term)) |
+                    (Product.product_id.ilike(search_term)) |
+                    (Product.description.ilike(search_term))
+                )
+            
+            # Get total count
+            total = query.count()
+            
+            # Apply pagination and ordering
+            products = query.order_by(Product.updated_at.desc()).offset(skip).limit(limit).all()
+            
+            # Get inventory for each product
+            result = []
+            for product in products:
+                inventory = db.query(Inventory).filter(Inventory.product_id == product.product_id).first()
+                stock_quantity = inventory.current_stock if inventory else 0
+                
+                # Determine stock status
+                if stock_quantity == 0:
+                    status = 'out_of_stock'
+                elif inventory and product.reorder_point and stock_quantity <= product.reorder_point:
+                    status = 'low_stock'
+                else:
+                    status = 'in_stock'
+                
+                product_data = {
+                    'id': product.product_id,
+                    'product_id': product.product_id,
+                    'name': product.name,
+                    'category': product.category,
+                    'description': product.description,
+                    'price': product.unit_price,
+                    'unit_price': product.unit_price,
+                    'stock': stock_quantity,
+                    'weight_kg': product.weight_kg,
+                    'dimensions': product.dimensions,
+                    'supplier_id': product.supplier_id,
+                    'reorder_point': product.reorder_point,
+                    'max_stock': product.max_stock,
+                    'status': status,
+                    'is_active': product.is_active,
+                    'image': product.primary_image_url or product.thumbnail_url or 'https://via.placeholder.com/200',
+                    'thumbnail_url': product.thumbnail_url,
+                    'primary_image_url': product.primary_image_url,
+                    'gallery_images': json.loads(product.gallery_images) if product.gallery_images else [],
+                    'marketing_description': product.marketing_description,
+                    'key_features': json.loads(product.key_features) if product.key_features else [],
+                    'specifications': json.loads(product.specifications) if product.specifications else {},
+                    'created_at': product.created_at.isoformat() if product.created_at else None,
+                    'updated_at': product.updated_at.isoformat() if product.updated_at else None,
+                }
+                result.append(product_data)
+            
+            return {
+                'products': result,
+                'total': total,
+                'skip': skip,
+                'limit': limit
+            }
+        finally:
+            db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch products: {str(e)}")
+
+@app.get("/products/{product_id}")
+async def get_product(
+    product_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get a single product by ID"""
+    try:
+        db = SessionLocal()
+        try:
+            product = db.query(Product).filter(Product.product_id == product_id).first()
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
+            
+            inventory = db.query(Inventory).filter(Inventory.product_id == product_id).first()
+            stock_quantity = inventory.current_stock if inventory else 0
+            
+            if stock_quantity == 0:
+                status = 'out_of_stock'
+            elif inventory and product.reorder_point and stock_quantity <= product.reorder_point:
+                status = 'low_stock'
+            else:
+                status = 'in_stock'
+            
+            return {
+                'id': product.product_id,
+                'product_id': product.product_id,
+                'name': product.name,
+                'category': product.category,
+                'description': product.description,
+                'price': product.unit_price,
+                'unit_price': product.unit_price,
+                'stock': stock_quantity,
+                'weight_kg': product.weight_kg,
+                'dimensions': product.dimensions,
+                'supplier_id': product.supplier_id,
+                'reorder_point': product.reorder_point,
+                'max_stock': product.max_stock,
+                'status': status,
+                'is_active': product.is_active,
+                'image': product.primary_image_url or product.thumbnail_url or 'https://via.placeholder.com/200',
+                'thumbnail_url': product.thumbnail_url,
+                'primary_image_url': product.primary_image_url,
+                'gallery_images': json.loads(product.gallery_images) if product.gallery_images else [],
+                'marketing_description': product.marketing_description,
+                'key_features': json.loads(product.key_features) if product.key_features else [],
+                'specifications': json.loads(product.specifications) if product.specifications else {},
+                'created_at': product.created_at.isoformat() if product.created_at else None,
+                'updated_at': product.updated_at.isoformat() if product.updated_at else None,
+            }
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch product: {str(e)}")
+
+@app.post("/products")
+async def create_product(
+    product_data: ProductCreate,
+    current_user: User = Depends(require_permission("write:products"))
+):
+    """Create a new product"""
+    try:
+        db = SessionLocal()
+        try:
+            # Check if product_id already exists
+            existing = db.query(Product).filter(Product.product_id == product_data.product_id).first()
+            if existing:
+                raise HTTPException(status_code=400, detail=f"Product {product_data.product_id} already exists")
+            
+            # Create product
+            new_product = Product(
+                product_id=product_data.product_id,
+                name=product_data.name,
+                category=product_data.category,
+                description=product_data.description,
+                unit_price=product_data.unit_price,
+                weight_kg=product_data.weight_kg,
+                dimensions=product_data.dimensions,
+                supplier_id=product_data.supplier_id,
+                reorder_point=product_data.reorder_point,
+                max_stock=product_data.max_stock,
+                is_active=product_data.is_active,
+                marketing_description=product_data.marketing_description,
+                key_features=product_data.key_features,
+                specifications=product_data.specifications,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            
+            db.add(new_product)
+            db.commit()
+            db.refresh(new_product)
+            
+            # Create initial inventory entry
+            initial_inventory = Inventory(
+                product_id=product_data.product_id,
+                current_stock=0,
+                reserved_stock=0,
+                available_stock=0,
+                last_updated=datetime.utcnow()
+            )
+            db.add(initial_inventory)
+            db.commit()
+            
+            return {
+                'id': new_product.product_id,
+                'product_id': new_product.product_id,
+                'name': new_product.name,
+                'message': 'Product created successfully'
+            }
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create product: {str(e)}")
+
+@app.put("/products/{product_id}")
+async def update_product(
+    product_id: str,
+    product_data: ProductUpdate,
+    current_user: User = Depends(require_permission("write:products"))
+):
+    """Update an existing product"""
+    try:
+        db = SessionLocal()
+        try:
+            product = db.query(Product).filter(Product.product_id == product_id).first()
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
+            
+            # Update fields
+            update_data = product_data.dict(exclude_unset=True)
+            for field, value in update_data.items():
+                setattr(product, field, value)
+            
+            product.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(product)
+            
+            return {
+                'id': product.product_id,
+                'product_id': product.product_id,
+                'name': product.name,
+                'message': 'Product updated successfully'
+            }
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update product: {str(e)}")
+
+@app.delete("/products/{product_id}")
+async def delete_product(
+    product_id: str,
+    current_user: User = Depends(require_permission("write:products"))
+):
+    """Delete a product (soft delete by setting is_active=False)"""
+    try:
+        db = SessionLocal()
+        try:
+            product = db.query(Product).filter(Product.product_id == product_id).first()
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
+            
+            # Soft delete
+            product.is_active = False
+            product.updated_at = datetime.utcnow()
+            db.commit()
+            
+            return {'message': f'Product {product_id} deleted successfully'}
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete product: {str(e)}")
+
+@app.get("/products/categories")
+async def get_categories(current_user: User = Depends(get_current_user)):
+    """Get all product categories"""
+    try:
+        db = SessionLocal()
+        try:
+            categories = db.query(Product.category).distinct().all()
+            return {'categories': [cat[0] for cat in categories]}
+        finally:
+            db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch categories: {str(e)}")
+
+@app.get("/products/stats")
+async def get_product_stats(current_user: User = Depends(get_current_user)):
+    """Get product statistics"""
+    try:
+        db = SessionLocal()
+        try:
+            total_products = db.query(Product).filter(Product.is_active == True).count()
+            
+            # Get inventory stats
+            in_stock = 0
+            low_stock = 0
+            out_of_stock = 0
+            
+            products = db.query(Product).filter(Product.is_active == True).all()
+            for product in products:
+                inventory = db.query(Inventory).filter(Inventory.product_id == product.product_id).first()
+                stock = inventory.current_stock if inventory else 0
+                
+                if stock == 0:
+                    out_of_stock += 1
+                elif product.reorder_point and stock <= product.reorder_point:
+                    low_stock += 1
+                else:
+                    in_stock += 1
+            
+            return {
+                'total_products': total_products,
+                'in_stock': in_stock,
+                'low_stock': low_stock,
+                'out_of_stock': out_of_stock
+            }
+        finally:
+            db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
 
 # === PRODUCT IMAGE ENDPOINTS ===
 

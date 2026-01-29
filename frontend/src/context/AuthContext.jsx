@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase, isMockSupabase } from '@/lib/supabase';
 import { authService } from '@/services/auth/authService';
+import { API_BASE_URL } from '@/utils/constants';
 
 const AuthContext = createContext(null);
 
@@ -11,6 +12,12 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
+    // Safety timeout: ensure loading is always set to false within 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      console.warn('Auth initialization timeout - forcing loading to false');
+      setLoading(false);
+    }, 5000);
+
     // Get initial session
     const initializeAuth = async () => {
       try {
@@ -20,13 +27,32 @@ export const AuthProvider = ({ children }) => {
           setSession(initialSession);
           setUser(initialSession?.user ?? null);
 
-          // Get user profile if session exists
+          // Get user profile if session exists (with timeout)
           if (initialSession?.user) {
+            // Store token in localStorage if available
+            if (initialSession.access_token) {
+              localStorage.setItem('token', initialSession.access_token);
+            }
+            
+            const profilePromise = authService.getUserProfile(initialSession.user.id).catch(err => {
+              console.warn('Could not load user profile:', err);
+              return null;
+            });
+            
+            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 2000));
+            
             try {
-              const userProfile = await authService.getUserProfile(initialSession.user.id);
-              setProfile(userProfile);
+              const userProfile = await Promise.race([profilePromise, timeoutPromise]);
+              if (userProfile) {
+                setProfile(userProfile);
+              }
             } catch (profileError) {
               console.warn('Could not load user profile:', profileError);
+            }
+          } else {
+            // No session - check if we have a dev token
+            if (isMockSupabase() && !localStorage.getItem('token')) {
+              localStorage.setItem('token', 'dev-token-' + Date.now());
             }
           }
         } else {
@@ -37,6 +63,7 @@ export const AuthProvider = ({ children }) => {
         console.error('Error initializing auth:', error);
         // Don't block the app if auth fails
       } finally {
+        clearTimeout(safetyTimeout);
         setLoading(false);
       }
     };
@@ -53,11 +80,26 @@ export const AuthProvider = ({ children }) => {
             setSession(currentSession);
             setUser(currentSession?.user ?? null);
 
-            // Get profile when user signs in
+            // Get profile when user signs in (with timeout to prevent hanging)
             if (event === 'SIGNED_IN' && currentSession?.user) {
+              // Store token in localStorage
+              if (currentSession.access_token) {
+                localStorage.setItem('token', currentSession.access_token);
+              }
+              
+              // Use Promise.race to add timeout
+              const profilePromise = authService.getUserProfile(currentSession.user.id).catch(err => {
+                console.warn('Could not load user profile:', err);
+                return null;
+              });
+              
+              const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 3000));
+              
               try {
-                const userProfile = await authService.getUserProfile(currentSession.user.id);
-                setProfile(userProfile);
+                const userProfile = await Promise.race([profilePromise, timeoutPromise]);
+                if (userProfile) {
+                  setProfile(userProfile);
+                }
               } catch (profileError) {
                 console.warn('Could not load user profile:', profileError);
               }
@@ -66,8 +108,10 @@ export const AuthProvider = ({ children }) => {
             // Clear profile when user signs out
             if (event === 'SIGNED_OUT') {
               setProfile(null);
+              localStorage.removeItem('token');
             }
 
+            // Always set loading to false, even if profile loading fails
             setLoading(false);
           }
         );
@@ -81,6 +125,8 @@ export const AuthProvider = ({ children }) => {
       if (subscription && subscription.unsubscribe) {
         subscription.unsubscribe();
       }
+      // Ensure loading is false on unmount
+      setLoading(false);
     };
   }, []);
 
@@ -101,10 +147,58 @@ export const AuthProvider = ({ children }) => {
         setUser(signedInUser);
         setSession(newSession);
         
-        // Get user profile
+        // Also login to backend API to get JWT token
         try {
-          const userProfile = await authService.getUserProfile(signedInUser.id);
-          setProfile(userProfile);
+          const backendLoginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: email, // Backend uses username field
+              password: password
+            })
+          });
+          
+          if (backendLoginResponse.ok) {
+            const backendToken = await backendLoginResponse.json();
+            if (backendToken.access_token) {
+              localStorage.setItem('token', backendToken.access_token);
+            }
+          } else {
+            // If backend login fails, use Supabase token or create dev token
+            if (newSession?.access_token) {
+              localStorage.setItem('token', newSession.access_token);
+            } else if (result?.session?.access_token) {
+              localStorage.setItem('token', result.session.access_token);
+            } else if (result?.data?.session?.access_token) {
+              localStorage.setItem('token', result.data.session.access_token);
+            } else if (isMockSupabase()) {
+              // In dev mode, create a mock token
+              localStorage.setItem('token', 'dev-token-' + Date.now());
+            }
+          }
+        } catch (backendError) {
+          console.warn('Backend login failed, using Supabase token:', backendError);
+          // Fallback to Supabase token or dev token
+          if (newSession?.access_token) {
+            localStorage.setItem('token', newSession.access_token);
+          } else if (isMockSupabase()) {
+            localStorage.setItem('token', 'dev-token-' + Date.now());
+          }
+        }
+        
+        // Get user profile (with timeout to prevent hanging)
+        const profilePromise = authService.getUserProfile(signedInUser.id).catch(err => {
+          console.warn('Could not load user profile:', err);
+          return null;
+        });
+        
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 3000));
+        
+        try {
+          const userProfile = await Promise.race([profilePromise, timeoutPromise]);
+          if (userProfile) {
+            setProfile(userProfile);
+          }
         } catch (profileError) {
           console.warn('Could not load user profile:', profileError);
         }
@@ -167,6 +261,8 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setSession(null);
       setProfile(null);
+      // Remove token from localStorage
+      localStorage.removeItem('token');
     } catch (error) {
       throw error;
     } finally {

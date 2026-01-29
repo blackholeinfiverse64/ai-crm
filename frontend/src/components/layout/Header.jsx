@@ -9,6 +9,8 @@ import Badge from '../common/ui/Badge';
 export const Header = ({ onMenuClick, isDark, onThemeToggle }) => {
   const [notifications] = React.useState(3);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
+  const [showSearch, setShowSearch] = React.useState(false);
+  const [showNotifications, setShowNotifications] = React.useState(false);
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -75,6 +77,16 @@ export const Header = ({ onMenuClick, isDark, onThemeToggle }) => {
               type="text"
               placeholder="Search..."
               className="pl-10 pr-4 py-2 w-48 lg:w-64 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const query = e.target.value.trim();
+                  if (query) {
+                    // Navigate to search results or perform search
+                    console.log('Searching for:', query);
+                    // You can add search functionality here
+                  }
+                }
+              }}
             />
           </div>
 
@@ -82,17 +94,51 @@ export const Header = ({ onMenuClick, isDark, onThemeToggle }) => {
           <Button 
             variant="ghost" 
             size="icon" 
+            onClick={() => {
+              setShowSearch(!showSearch);
+              if (!showSearch) {
+                // Focus search input after a brief delay
+                setTimeout(() => {
+                  const searchInput = document.querySelector('.mobile-search-input');
+                  if (searchInput) searchInput.focus();
+                }, 100);
+              }
+            }}
             className="md:hidden hover:scale-110 transition-transform"
             aria-label="Search"
           >
             <Search className="h-5 w-5" />
           </Button>
+          
+          {/* Mobile Search Input */}
+          {showSearch && (
+            <div className="absolute top-full left-0 right-0 bg-card border-b border-border p-4 md:hidden z-50">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="mobile-search-input pl-10 pr-4 py-2 w-full rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                  onBlur={() => setTimeout(() => setShowSearch(false), 200)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setShowSearch(false);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Notifications */}
           <div className="relative">
             <Button 
               variant="ghost" 
               size="icon"
+              onClick={() => {
+                setShowNotifications(!showNotifications);
+                navigate('/notifications');
+              }}
               className="hover:scale-110 transition-transform"
               aria-label="Notifications"
             >

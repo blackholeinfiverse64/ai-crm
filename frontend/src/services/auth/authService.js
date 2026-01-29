@@ -197,27 +197,40 @@ export const authService = {
   // Get user profile
   async getUserProfile(userId) {
     if (isMockSupabase() && DEV_MODE_ENABLED) {
-      // Return mock profile in dev mode
-      return {
+      // Return mock profile in dev mode immediately
+      return Promise.resolve({
         id: userId,
         email: 'dev@example.com',
         first_name: 'Dev',
         last_name: 'User',
         company_name: 'Dev Company'
-      }
+      })
     }
 
-    const { data, error } = await supabase
+    // Add timeout to prevent hanging
+    const queryPromise = supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
 
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 = not found, which is okay
-      throw error
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Profile query timeout')), 2000)
+    )
+
+    try {
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = not found, which is okay
+        throw error
+      }
+      return data
+    } catch (err) {
+      // If timeout or other error, return null instead of throwing
+      console.warn('getUserProfile error:', err)
+      return null
     }
-    return data
   },
 
   // Resend verification email

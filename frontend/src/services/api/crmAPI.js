@@ -2,36 +2,40 @@ import apiClient from './baseAPI';
 
 export const crmAPI = {
   // Accounts
-  getAccounts: (params) => apiClient.get('/api/crm/accounts', { params }),
-  getAccount: (id) => apiClient.get(`/api/crm/accounts/${id}`),
-  createAccount: (data) => apiClient.post('/api/crm/accounts', data),
-  updateAccount: (id, data) => apiClient.put(`/api/crm/accounts/${id}`, data),
-  deleteAccount: (id) => apiClient.delete(`/api/crm/accounts/${id}`),
+  getAccounts: (params) => apiClient.get('/accounts', { params }),
+  getAccount: (id) => apiClient.get(`/accounts/${id}`),
+  createAccount: (data) => apiClient.post('/accounts', data),
+  updateAccount: (id, data) => apiClient.put(`/accounts/${id}`, data),
+  
+  // Contacts
+  getContacts: (params) => apiClient.get('/contacts', { params }),
+  getContact: (id) => apiClient.get(`/contacts/${id}`),
+  createContact: (data) => apiClient.post('/contacts', data),
+  updateContact: (id, data) => apiClient.put(`/contacts/${id}`, data),
   
   // Leads
-  getLeads: (params) => apiClient.get('/api/crm/leads', { params }),
-  getLead: (id) => apiClient.get(`/api/crm/leads/${id}`),
-  createLead: (data) => apiClient.post('/api/crm/leads', data),
-  updateLead: (id, data) => apiClient.put(`/api/crm/leads/${id}`, data),
-  convertLead: (id, data) => apiClient.post(`/api/crm/leads/${id}/convert`, data),
+  getLeads: (params) => apiClient.get('/leads', { params }),
+  getLead: (id) => apiClient.get(`/leads/${id}`),
+  createLead: (data) => apiClient.post('/leads', data),
+  updateLead: (id, data) => apiClient.put(`/leads/${id}`, data),
   
   // Opportunities
-  getOpportunities: (params) => apiClient.get('/api/crm/opportunities', { params }),
-  getOpportunity: (id) => apiClient.get(`/api/crm/opportunities/${id}`),
-  createOpportunity: (data) => apiClient.post('/api/crm/opportunities', data),
-  updateOpportunity: (id, data) => apiClient.put(`/api/crm/opportunities/${id}`, data),
-  updateStage: (id, stage) => apiClient.patch(`/api/crm/opportunities/${id}/stage`, { stage }),
+  getOpportunities: (params) => apiClient.get('/opportunities', { params }),
+  getOpportunity: (id) => apiClient.get(`/opportunities/${id}`),
+  createOpportunity: (data) => apiClient.post('/opportunities', data),
+  updateOpportunity: (id, data) => apiClient.put(`/opportunities/${id}`, data),
   
   // Activities
-  getActivities: (params) => apiClient.get('/api/crm/activities', { params }),
-  getActivity: (id) => apiClient.get(`/api/crm/activities/${id}`),
-  createActivity: (data) => apiClient.post('/api/crm/activities', data),
-  updateActivity: (id, data) => apiClient.put(`/api/crm/activities/${id}`, data),
-  completeActivity: (id) => apiClient.post(`/api/crm/activities/${id}/complete`),
+  getActivities: (params) => apiClient.get('/activities', { params }),
+  getActivity: (id) => apiClient.get(`/activities/${id}`),
+  createActivity: (data) => apiClient.post('/activities', data),
+  updateActivity: (id, data) => apiClient.put(`/activities/${id}`, data),
   
-  // Dashboard
-  getDashboardMetrics: () => apiClient.get('/api/crm/dashboard/metrics'),
-  getPipeline: () => apiClient.get('/api/crm/pipeline'),
+  // Tasks
+  getTasks: (params) => apiClient.get('/tasks', { params }),
+  getTask: (id) => apiClient.get(`/tasks/${id}`),
+  createTask: (data) => apiClient.post('/tasks', data),
+  updateTask: (id, data) => apiClient.put(`/tasks/${id}`, data),
 };
 
 export default crmAPI;

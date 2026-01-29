@@ -26,6 +26,7 @@ export const agentAPI = {
   // Dashboard
   getDashboardMetrics: () => apiClient.get('/api/agents/dashboard/metrics'),
   getAgentActivity: (params) => apiClient.get('/api/agents/activity', { params }),
+  getAgentLogs: (params) => apiClient.get('/api/agents/logs', { params }),
 };
 
 export default agentAPI;
