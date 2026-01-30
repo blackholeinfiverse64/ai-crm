@@ -1054,126 +1054,140 @@ export const CRM = () => {
           });
         }}
       >
-        <div className="space-y-4">
-          <Input
-            label="Account Name *"
-            value={accountForm.name}
-            onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
-            placeholder="Enter account name"
-            required
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Account Type"
-              value={accountForm.account_type}
-              onChange={(e) => setAccountForm({ ...accountForm, account_type: e.target.value })}
-              options={[
-                { value: 'customer', label: 'Customer' },
-                { value: 'prospect', label: 'Prospect' },
-                { value: 'partner', label: 'Partner' },
-              ]}
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+          {/* Essential Fields Section */}
+          <div className="space-y-4">
+            <div className="text-sm font-medium text-foreground mb-2">Essential Information</div>
+            
+            <Input
+              label="Account Name *"
+              value={accountForm.name}
+              onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
+              placeholder="Enter company name"
+              required
             />
-            <Select
-              label="Lifecycle Stage"
-              value={accountForm.lifecycle_stage}
-              onChange={(e) => setAccountForm({ ...accountForm, lifecycle_stage: e.target.value })}
-              options={[
-                { value: 'prospect', label: 'Prospect' },
-                { value: 'customer', label: 'Customer' },
-                { value: 'partner', label: 'Partner' },
-              ]}
+            
+            <div className="grid grid-cols-2 gap-3">
+              <Select
+                label="Account Type"
+                value={accountForm.account_type}
+                onChange={(e) => setAccountForm({ ...accountForm, account_type: e.target.value })}
+                options={[
+                  { value: 'customer', label: 'Customer' },
+                  { value: 'prospect', label: 'Prospect' },
+                  { value: 'partner', label: 'Partner' },
+                ]}
+              />
+              <Select
+                label="Status"
+                value={accountForm.status}
+                onChange={(e) => setAccountForm({ ...accountForm, status: e.target.value })}
+                options={[
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                ]}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Email"
+                type="email"
+                value={accountForm.email}
+                onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
+                placeholder="contact@company.com"
+              />
+              <Input
+                label="Phone"
+                value={accountForm.phone}
+                onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })}
+                placeholder="+1-555-0123"
+              />
+            </div>
+
+            <Input
+              label="Industry"
+              value={accountForm.industry}
+              onChange={(e) => setAccountForm({ ...accountForm, industry: e.target.value })}
+              placeholder="e.g., Technology, Healthcare, Finance"
             />
           </div>
-          <Input
-            label="Industry"
-            value={accountForm.industry}
-            onChange={(e) => setAccountForm({ ...accountForm, industry: e.target.value })}
-            placeholder="Enter industry"
-          />
-          <div className="grid grid-cols-2 gap-4">
+
+          {/* Additional Details Section - Compact */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <div className="text-sm font-medium text-foreground mb-2">Additional Details (Optional)</div>
+            
             <Input
-              label="Email"
-              type="email"
-              value={accountForm.email}
-              onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
-              placeholder="contact@company.com"
+              label="Website"
+              value={accountForm.website}
+              onChange={(e) => setAccountForm({ ...accountForm, website: e.target.value })}
+              placeholder="https://www.company.com"
             />
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Annual Revenue"
+                type="number"
+                value={accountForm.annual_revenue}
+                onChange={(e) => setAccountForm({ ...accountForm, annual_revenue: e.target.value })}
+                placeholder="5000000"
+              />
+              <Input
+                label="Employee Count"
+                type="number"
+                value={accountForm.employee_count}
+                onChange={(e) => setAccountForm({ ...accountForm, employee_count: e.target.value })}
+                placeholder="150"
+              />
+            </div>
+
             <Input
-              label="Phone"
-              value={accountForm.phone}
-              onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })}
-              placeholder="+1-555-0123"
-            />
-          </div>
-          <Input
-            label="Website"
-            value={accountForm.website}
-            onChange={(e) => setAccountForm({ ...accountForm, website: e.target.value })}
-            placeholder="https://www.company.com"
-          />
-          <Input
-            label="Billing Address"
-            value={accountForm.billing_address}
-            onChange={(e) => setAccountForm({ ...accountForm, billing_address: e.target.value })}
-            placeholder="123 Business Street"
-          />
-          <div className="grid grid-cols-3 gap-4">
-            <Input
-              label="City"
-              value={accountForm.city}
-              onChange={(e) => setAccountForm({ ...accountForm, city: e.target.value })}
-              placeholder="City"
-            />
-            <Input
-              label="State"
-              value={accountForm.state}
-              onChange={(e) => setAccountForm({ ...accountForm, state: e.target.value })}
-              placeholder="State"
-            />
-            <Input
-              label="Postal Code"
-              value={accountForm.postal_code}
-              onChange={(e) => setAccountForm({ ...accountForm, postal_code: e.target.value })}
-              placeholder="12345"
+              label="Territory"
+              value={accountForm.territory}
+              onChange={(e) => setAccountForm({ ...accountForm, territory: e.target.value })}
+              placeholder="Sales territory"
             />
           </div>
-          <Input
-            label="Country"
-            value={accountForm.country}
-            onChange={(e) => setAccountForm({ ...accountForm, country: e.target.value })}
-            placeholder="Country"
-          />
-          <div className="grid grid-cols-2 gap-4">
+
+          {/* Address Section - Compact */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <div className="text-sm font-medium text-foreground mb-2">Address (Optional)</div>
+            
             <Input
-              label="Annual Revenue"
-              type="number"
-              value={accountForm.annual_revenue}
-              onChange={(e) => setAccountForm({ ...accountForm, annual_revenue: e.target.value })}
-              placeholder="5000000"
+              label="Street Address"
+              value={accountForm.billing_address}
+              onChange={(e) => setAccountForm({ ...accountForm, billing_address: e.target.value })}
+              placeholder="123 Business Street"
             />
+            
+            <div className="grid grid-cols-3 gap-3">
+              <Input
+                label="City"
+                value={accountForm.city}
+                onChange={(e) => setAccountForm({ ...accountForm, city: e.target.value })}
+                placeholder="City"
+              />
+              <Input
+                label="State"
+                value={accountForm.state}
+                onChange={(e) => setAccountForm({ ...accountForm, state: e.target.value })}
+                placeholder="State"
+              />
+              <Input
+                label="Postal Code"
+                value={accountForm.postal_code}
+                onChange={(e) => setAccountForm({ ...accountForm, postal_code: e.target.value })}
+                placeholder="12345"
+              />
+            </div>
+
             <Input
-              label="Employee Count"
-              type="number"
-              value={accountForm.employee_count}
-              onChange={(e) => setAccountForm({ ...accountForm, employee_count: e.target.value })}
-              placeholder="150"
+              label="Country"
+              value={accountForm.country}
+              onChange={(e) => setAccountForm({ ...accountForm, country: e.target.value })}
+              placeholder="Country"
             />
           </div>
-          <Input
-            label="Territory"
-            value={accountForm.territory}
-            onChange={(e) => setAccountForm({ ...accountForm, territory: e.target.value })}
-            placeholder="Sales territory"
-          />
-          <Select
-            label="Status"
-            value={accountForm.status}
-            onChange={(e) => setAccountForm({ ...accountForm, status: e.target.value })}
-            options={[
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
-            ]}
-          />
         </div>
         <ModalFooter>
           <Button
@@ -1207,68 +1221,87 @@ export const CRM = () => {
               try {
                 setLoading(true);
                 setError(null);
+                setSuccess(null);
                 
-                if (!accountForm.name) {
+                if (!accountForm.name || !accountForm.name.trim()) {
                   setError('Account name is required');
                   setLoading(false);
                   return;
                 }
 
                 const accountData = {
-                  name: accountForm.name,
-                  account_type: accountForm.account_type,
-                  industry: accountForm.industry || null,
-                  website: accountForm.website || null,
-                  phone: accountForm.phone || null,
-                  email: accountForm.email || null,
-                  billing_address: accountForm.billing_address || null,
-                  city: accountForm.city || null,
-                  state: accountForm.state || null,
-                  country: accountForm.country || null,
-                  postal_code: accountForm.postal_code || null,
+                  name: accountForm.name.trim(),
+                  account_type: accountForm.account_type || 'customer',
+                  industry: accountForm.industry?.trim() || null,
+                  website: accountForm.website?.trim() || null,
+                  phone: accountForm.phone?.trim() || null,
+                  email: accountForm.email?.trim() || null,
+                  billing_address: accountForm.billing_address?.trim() || null,
+                  city: accountForm.city?.trim() || null,
+                  state: accountForm.state?.trim() || null,
+                  country: accountForm.country?.trim() || null,
+                  postal_code: accountForm.postal_code?.trim() || null,
                   annual_revenue: accountForm.annual_revenue ? parseFloat(accountForm.annual_revenue) : null,
                   employee_count: accountForm.employee_count ? parseInt(accountForm.employee_count) : null,
-                  territory: accountForm.territory || null,
-                  status: accountForm.status,
-                  lifecycle_stage: accountForm.lifecycle_stage,
+                  territory: accountForm.territory?.trim() || null,
+                  status: accountForm.status || 'active',
+                  lifecycle_stage: accountForm.lifecycle_stage || 'prospect',
                 };
 
-                await crmAPI.createAccount(accountData);
-                setSuccess('Account created successfully!');
-                setShowAddAccountModal(false);
-                setAccountForm({
-                  name: '',
-                  account_type: 'customer',
-                  industry: '',
-                  website: '',
-                  phone: '',
-                  email: '',
-                  billing_address: '',
-                  city: '',
-                  state: '',
-                  country: '',
-                  postal_code: '',
-                  annual_revenue: '',
-                  employee_count: '',
-                  territory: '',
-                  status: 'active',
-                  lifecycle_stage: 'prospect',
-                });
+                const response = await crmAPI.createAccount(accountData);
                 
-                // Refresh data
-                setTimeout(() => {
-                  fetchCRMData();
-                  setSuccess(null);
-                }, 1000);
+                if (response && response.data) {
+                  setSuccess('Account created successfully!');
+                  setShowAddAccountModal(false);
+                  
+                  // Reset form
+                  setAccountForm({
+                    name: '',
+                    account_type: 'customer',
+                    industry: '',
+                    website: '',
+                    phone: '',
+                    email: '',
+                    billing_address: '',
+                    city: '',
+                    state: '',
+                    country: '',
+                    postal_code: '',
+                    annual_revenue: '',
+                    employee_count: '',
+                    territory: '',
+                    status: 'active',
+                    lifecycle_stage: 'prospect',
+                  });
+                  
+                  // Refresh data
+                  await fetchCRMData();
+                  
+                  // Clear success message after 3 seconds
+                  setTimeout(() => {
+                    setSuccess(null);
+                  }, 3000);
+                } else {
+                  throw new Error('Unexpected response from server');
+                }
               } catch (err) {
-                setError(err.response?.data?.detail || err.message || 'Failed to create account');
+                console.error('Error creating account:', err);
+                const errorMessage = err.response?.data?.detail || err.message || 'Failed to create account. Please try again.';
+                setError(errorMessage);
               } finally {
                 setLoading(false);
               }
             }}
-            disabled={loading}
+            disabled={loading || !accountForm.name?.trim()}
           >
-            {loading ? 'Creating...' : 'Create Account'}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Account'
+            )}
           </Button>
         </ModalFooter>
       </Modal>
